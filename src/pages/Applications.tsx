@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { ArrowRight, MapPin, Users, Search } from "lucide-react";
-import React from "react";
+import React, { useEffect } from "react";
 
 const Applications = () => {
 	const { applications, isLoading } = useApplications();
@@ -13,6 +13,23 @@ const Applications = () => {
 	const [riskFilter, setRiskFilter] = React.useState<
 		"all" | "low" | "medium" | "high"
 	>("all");
+
+	// Debug: log what the hook is really providing
+	useEffect(() => {
+		console.log("[LIST PAGE] Received from hook - total:", applications.length);
+		console.log(
+			"[LIST PAGE] Org names:",
+			applications.map((a) => a.organizationName || "Unnamed"),
+		);
+		console.log(
+			"[LIST PAGE] Leader counts:",
+			applications.map((a) => a.leadership?.length || 0),
+		);
+		console.log(
+			"[LIST PAGE] Risk levels:",
+			applications.map((a) => a.riskAssessment?.level || "none"),
+		);
+	}, [applications]);
 
 	if (isLoading) {
 		return (
@@ -78,64 +95,75 @@ const Applications = () => {
 
 				{/* Applications Grid */}
 				<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
-					{filteredApplications.map((app) => (
-						<Card
-							key={app.id}
-							className="border hover:border-primary transition-colors cursor-pointer relative"
-						>
-							<CardHeader className="flex justify-between items-start relative">
-								<div className="flex-1 space-y-2">
-									{/* Organization Name */}
-									<CardTitle className="text-2xl md:text-3xl font-bold">
-										{app.organizationName}
-									</CardTitle>
+					{filteredApplications.length === 0 ? (
+						<p className="text-center text-muted-foreground col-span-full py-8">
+							No applications found
+						</p>
+					) : (
+						filteredApplications.map((app) => (
+							<Card
+								key={app.id}
+								className="border hover:border-primary transition-colors cursor-pointer relative"
+							>
+								<CardHeader className="flex justify-between items-start relative">
+									<div className="flex-1 space-y-2">
+										{/* Organization Name */}
+										<CardTitle className="text-2xl md:text-3xl font-bold">
+											{app.organizationName}
+										</CardTitle>
 
-									{/* Location */}
-									<div className="flex items-center text-sm text-muted-foreground gap-1">
-										<MapPin size={14} /> {app.city}, {app.country}
+										{/* Location */}
+										<div className="flex items-center text-sm text-muted-foreground gap-1">
+											<MapPin className="w-4 h-4" />
+											<p>
+												{app.city && app.city !== app.country
+													? `${app.city}, ${app.country}`
+													: app.country}
+											</p>
+										</div>
+
+										{/* Leaders */}
+										<div className="flex items-center text-sm text-muted-foreground gap-1">
+											<Users size={14} /> {app.leadership?.length || 0} leader
+											{app.leadership?.length !== 1 ? "s" : ""}
+										</div>
+
+										{/* Full-width separator line */}
+										<hr className="my-2 border-t border-gray-200 w-full" />
+
+										{/* Risk Score */}
+										<p className="text-sm font-bold text-muted-foreground">
+											Risk Score: {app.riskAssessment?.score ?? 0}
+										</p>
 									</div>
 
-									{/* Leaders */}
-									<div className="flex items-center text-sm text-muted-foreground gap-1">
-										<Users size={14} /> {app.leadership.length} leader
-										{app.leadership.length > 1 ? "s" : ""}
-									</div>
+									{/* Risk Badge top-right */}
+									{app.riskAssessment && (
+										<Badge
+											className={`text-xs py-1 px-2 absolute top-3 right-3 ${
+												app.riskAssessment.level === "high"
+													? "bg-red-100 text-red-800 border border-red-200"
+													: app.riskAssessment.level === "medium"
+														? "bg-yellow-100 text-yellow-800 border border-yellow-200"
+														: "bg-green-100 text-green-800 border border-green-200"
+											}`}
+										>
+											{app.riskAssessment.level.toUpperCase()}
+										</Badge>
+									)}
+								</CardHeader>
 
-									{/* Full-width separator line */}
-									<hr className="my-2 border-t border-gray-200 w-full" />
-
-									{/* Risk Score */}
-									<p className="text-sm font-bold text-muted-foreground">
-										Risk Score: {app.riskAssessment?.score ?? 0}
-									</p>
-								</div>
-
-								{/* Risk Badge top-right */}
-								{app.riskAssessment && (
-									<Badge
-										className={`text-xs py-1 px-2 absolute top-3 right-3 ${
-											app.riskAssessment.level === "high"
-												? "bg-red-100 text-red-800 border border-red-200"
-												: app.riskAssessment.level === "medium"
-													? "bg-yellow-100 text-yellow-800 border border-yellow-200"
-													: "bg-green-100 text-green-800 border border-green-200"
-										}`}
-									>
-										{app.riskAssessment.level.toUpperCase()}
-									</Badge>
-								)}
-							</CardHeader>
-
-							{/* Review Button */}
-							<CardContent className="flex justify-end mt-2">
-								<Link to={`/applications/${app.id}`}>
-									<Button size="sm" variant="outline">
-										Review <ArrowRight className="w-4 h-4 ml-1" />
-									</Button>
-								</Link>
-							</CardContent>
-						</Card>
-					))}
+								{/* Review Button */}
+								<CardContent className="flex justify-end mt-2">
+									<Link to={`/applications/${app.id}`}>
+										<Button size="sm" variant="outline">
+											Review <ArrowRight className="w-4 h-4 ml-1" />
+										</Button>
+									</Link>
+								</CardContent>
+							</Card>
+						))
+					)}
 				</div>
 			</div>
 		</DashboardLayout>
