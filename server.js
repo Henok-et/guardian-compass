@@ -224,7 +224,7 @@ app.get("/api/applications", async (req, res) => {
 				website: row[6] ? String(row[6]).trim() : "",
 				leadership,
 				missionStatement: row[22] ? String(row[22]).trim() : "",
-				yearEstablished: row[5] ? Number(String(row[5]).trim()) : undefined,
+				yearEstablished: row[5] ? String(row[5]).trim() : "",
 				memberCount: row[21] ? Number(String(row[21]).trim()) : 0,
 				hasRecentActivityProof: !!row[23],
 				submittedAt: row[0]

@@ -198,7 +198,12 @@ const ApplicationDetail = () => {
 										<p className="text-sm text-muted-foreground">
 											Year Established
 										</p>
-										<p className="font-medium">{application.yearEstablished}</p>
+										<p className="font-medium">
+											{application.yearEstablished
+												? new Date(application.yearEstablished).getFullYear() ||
+													application.yearEstablished
+												: "Not provided"}
+										</p>
 									</div>
 								</div>
 							</CardContent>
