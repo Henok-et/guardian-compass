@@ -3,6 +3,8 @@ import cors from "cors";
 import { google } from "googleapis";
 import dotenv from "dotenv";
 import { testRead } from "./testSheets.js";
+import { fileURLToPath } from "url";
+import path from "path";
 
 dotenv.config();
 
