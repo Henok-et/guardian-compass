@@ -270,7 +270,8 @@ app.get("/api/applications", async (req, res) => {
 });
 
 // React/Vite routing fallback
-app.get("*", (req, res) => {
+app.get("/*", (req, res) => {
+
 	res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
