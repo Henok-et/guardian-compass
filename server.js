@@ -7,10 +7,16 @@ import { testRead } from "./testSheets.js";
 dotenv.config();
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
+
+// Serve Vite build
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+app.use(express.static(path.join(__dirname, "dist")));
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 const SHEET_NAME = process.env.GOOGLE_SHEET_NAME;
@@ -259,6 +265,11 @@ app.get("/api/applications", async (req, res) => {
 		console.error("Error fetching applications:", error);
 		res.status(500).json({ message: "Failed to fetch applications" });
 	}
+});
+
+// React/Vite routing fallback
+app.get("*", (req, res) => {
+	res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
 app.listen(PORT, () => {
