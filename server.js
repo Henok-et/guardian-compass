@@ -24,10 +24,12 @@ const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 const SHEET_NAME = process.env.GOOGLE_SHEET_NAME;
 
 // Google Sheets auth
-const auth = new google.auth.GoogleAuth({
-	keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
-	scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
-});
+const auth = new google.auth.JWT(
+	process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+	null,
+	process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+	["https://www.googleapis.com/auth/spreadsheets"],
+);
 
 const sheets = google.sheets({ version: "v4", auth });
 
