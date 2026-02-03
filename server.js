@@ -54,7 +54,6 @@ try {
 
 const sheets = google.sheets({ version: "v4", auth });
 
-const sheets = google.sheets({ version: "v4", auth });
 
 // Calculate age from DOB (expects DD/MM/YYYY format)
 function calculateAge(dobString) {
