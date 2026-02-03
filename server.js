@@ -23,13 +23,36 @@ app.use(express.static(path.join(__dirname, "dist")));
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 const SHEET_NAME = process.env.GOOGLE_SHEET_NAME;
 
-// Google Sheets auth
-const auth = new google.auth.JWT(
-	process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-	null,
-	process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-	["https://www.googleapis.com/auth/spreadsheets"],
-);
+/// Google Sheets auth - Updated for Render.com environment
+let auth;
+try {
+    if (process.env.GOOGLE_CREDENTIALS) {
+        // For Render.com - parse JSON from environment variable
+        const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+        auth = new google.auth.JWT(
+            credentials.client_email,
+            null,
+            credentials.private_key.replace(/\\n/g, "\n"),
+            ["https://www.googleapis.com/auth/spreadsheets"]
+        );
+    } else {
+        // For local development - use individual variables
+        const privateKey = process.env.GOOGLE_PRIVATE_KEY || "";
+        auth = new google.auth.JWT(
+            process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+            null,
+            privateKey.replace(/\\n/g, "\n"),
+            ["https://www.googleapis.com/auth/spreadsheets"]
+        );
+    }
+    console.log("Google authentication initialized successfully");
+} catch (error) {
+    console.error("Failed to initialize Google auth:", error.message);
+    console.error("Error details:", error);
+    process.exit(1);
+}
+
+const sheets = google.sheets({ version: "v4", auth });
 
 const sheets = google.sheets({ version: "v4", auth });
 
