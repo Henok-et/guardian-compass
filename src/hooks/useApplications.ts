@@ -31,7 +31,8 @@ export function useApplications() {
 			localStorage.removeItem("au_verification_applications");
 
 			try {
-				const response = await fetch("http://localhost:5000/api/applications");
+				const response = await fetch("/api/applications");
+
 				if (!response.ok) {
 					throw new Error(`HTTP error! status: ${response.status}`);
 				}
