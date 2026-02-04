@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { getRiskBadgeColor } from "@/lib/riskScoring";
+import { getRiskBadgeColor, parseDOBToDate } from "@/lib/riskScoring";
 import {
 	ArrowLeft,
 	Building2,
@@ -87,6 +87,34 @@ const ApplicationDetail = () => {
 	const validLeadership = application.leadership.filter((leader) =>
 		leader.name?.trim(),
 	);
+
+	// Format leader age and label for display
+	const formatLeaderAgeLabel = (leader: { age?: number; dob?: string }) => {
+		let ageNumber: number | null = null;
+		if (typeof leader.age === "number" && Number.isFinite(leader.age)) {
+			ageNumber = leader.age;
+		} else if (leader.dob) {
+			const d = parseDOBToDate(leader.dob);
+			if (d) {
+				const today = new Date();
+				let age = today.getFullYear() - d.getFullYear();
+				const m = today.getMonth() - d.getMonth();
+				if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+				ageNumber = age;
+			}
+		}
+		let label = "Unknown";
+		if (ageNumber === null) {
+			label = "Unknown";
+		} else if (ageNumber < 0 || ageNumber > 120) {
+			label = "Invalid Age";
+		} else if (ageNumber >= 15 && ageNumber <= 35) {
+			label = "Youth";
+		} else {
+			label = "Not Youth";
+		}
+		return `Age: ${ageNumber !== null ? ageNumber : leader.dob || "Unknown"} (${label})`;
+	};
 
 	return (
 		<DashboardLayout>
@@ -261,12 +289,7 @@ const ApplicationDetail = () => {
 												)}
 
 												<div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-													{leader.age != null && leader.age > 0 && (
-														<span>Age: {leader.age}</span>
-													)}
-													{leader.dob && leader.age == null && (
-														<span>DOB: {leader.dob}</span>
-													)}
+													<span>{formatLeaderAgeLabel(leader)}</span>
 													{leader.hasId && (
 														<span className="text-green-600 font-medium">
 															✓ ID Verified
@@ -361,32 +384,48 @@ const ApplicationDetail = () => {
 								</CardTitle>
 							</CardHeader>
 							<CardContent>
-								{riskAssessment.sanctionMatches.length > 0 ? (
+								{riskAssessment.sanctionMatches.some(
+									(m) =>
+										m.inputName &&
+										m.sanctionedName &&
+										Number.isFinite(m.similarity),
+								) ? (
 									<div className="space-y-3">
-										{riskAssessment.sanctionMatches.map((match, index) => (
-											<div
-												key={index}
-												className="p-3 bg-destructive/10 rounded-lg text-sm"
-											>
-												<p className="font-medium text-destructive">
-													Potential Match Found
-												</p>
-												<p>
-													<span className="text-muted-foreground">Input:</span>{" "}
-													{match.inputName}
-												</p>
-												<p>
-													<span className="text-muted-foreground">Match:</span>{" "}
-													{match.sanctionedName}
-												</p>
-												<p>
-													<span className="text-muted-foreground">
-														Similarity:
-													</span>{" "}
-													{(match.similarity * 100).toFixed(1)}%
-												</p>
-											</div>
-										))}
+										{riskAssessment.sanctionMatches
+											.filter(
+												(m) =>
+													m.inputName &&
+													m.sanctionedName &&
+													Number.isFinite(m.similarity),
+											)
+											.map((match, index) => (
+												<div
+													key={index}
+													className="p-3 bg-destructive/10 rounded-lg text-sm"
+												>
+													<p className="font-medium text-destructive">
+														{`Sanctions Match Found: ${match.inputName}`}
+													</p>
+													<p>
+														<span className="text-muted-foreground">
+															Input:
+														</span>{" "}
+														{match.inputName}
+													</p>
+													<p>
+														<span className="text-muted-foreground">
+															Match:
+														</span>{" "}
+														{match.sanctionedName}
+													</p>
+													<p>
+														<span className="text-muted-foreground">
+															Similarity:
+														</span>{" "}
+														{(match.similarity * 100).toFixed(1)}%
+													</p>
+												</div>
+											))}
 									</div>
 								) : (
 									<div className="flex items-center gap-2 text-green-600">
