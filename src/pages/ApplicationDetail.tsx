@@ -1,3 +1,11 @@
+import { AnimatePresence, motion } from "framer-motion";
+import {
+	LoadingSpinner,
+	SkeletonCard,
+	PageLoader,
+	ActionLoadingOverlay,
+} from "@/components/animation";
+
 import { useParams, useNavigate } from "react-router-dom";
 import { useApplications } from "@/hooks/useApplications";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -23,6 +31,7 @@ import {
 	User,
 	FileWarning,
 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 
 const ApplicationDetail = () => {
 	const { id } = useParams<{ id: string }>();
@@ -32,20 +41,71 @@ const ApplicationDetail = () => {
 		approveApplication,
 		rejectApplication,
 		flagApplication,
-		isLoading,
+		isLoading: hookIsLoading,
 	} = useApplications();
 
-	if (isLoading) {
+	// Loading states
+	const [isPageLoading, setIsPageLoading] = useState(true);
+	const [isActionLoading, setIsActionLoading] = useState(false);
+	const [isSanctionsLoading, setIsSanctionsLoading] = useState(true);
+	const [progress, setProgress] = useState(0);
+
+	// Simulate loading delays (replace with your actual API calls)
+	useEffect(() => {
+		// Simulate initial page loading
+		const pageTimer = setTimeout(() => {
+			setIsPageLoading(false);
+		}, 800);
+
+		return () => {
+			clearTimeout(pageTimer);
+		};
+	}, []);
+
+	// Progress bar animation for sanctions check
+	useEffect(() => {
+		if (isPageLoading) return;
+
+		let animationFrame: number;
+		let startTime: number;
+		const duration = 3000; // 3 seconds
+
+		const animateProgress = (timestamp: number) => {
+			if (!startTime) startTime = timestamp;
+			const elapsed = timestamp - startTime;
+			const newProgress = Math.min((elapsed / duration) * 100, 100);
+
+			setProgress(newProgress);
+
+			if (elapsed < duration) {
+				animationFrame = requestAnimationFrame(animateProgress);
+			} else {
+				// Progress complete, show results after a small delay
+				setTimeout(() => {
+					setIsSanctionsLoading(false);
+				}, 300);
+			}
+		};
+
+		// Start the progress animation
+		animationFrame = requestAnimationFrame(animateProgress);
+
+		return () => {
+			if (animationFrame) {
+				cancelAnimationFrame(animationFrame);
+			}
+		};
+	}, [isPageLoading]);
+
+	const application = getApplicationById(id || "");
+
+	if (hookIsLoading || isPageLoading) {
 		return (
 			<DashboardLayout>
-				<div className="text-center py-12">
-					<p className="text-muted-foreground">Loading application...</p>
-				</div>
+				<PageLoader message="Loading application details..." />
 			</DashboardLayout>
 		);
 	}
-
-	const application = getApplicationById(id || "");
 
 	if (!application) {
 		return (
@@ -68,27 +128,12 @@ const ApplicationDetail = () => {
 	const { riskAssessment } = application;
 	const isActionable = application.status === "pending";
 
-	const handleApprove = () => {
-		approveApplication(application.id);
-		navigate("/verified");
-	};
-
-	const handleReject = () => {
-		rejectApplication(application.id);
-		navigate("/applications");
-	};
-
-	const handleFlag = () => {
-		flagApplication(application.id);
-		navigate("/flagged");
-	};
-
-	// Filter out invalid leadership entries (no name) to prevent broken cards
+	// Filter out invalid leadership entries
 	const validLeadership = application.leadership.filter((leader) =>
 		leader.name?.trim(),
 	);
 
-	// Format leader age and label for display
+	// Format leader age and label
 	const formatLeaderAgeLabel = (leader: { age?: number; dob?: string }) => {
 		let ageNumber: number | null = null;
 		if (typeof leader.age === "number" && Number.isFinite(leader.age)) {
@@ -116,380 +161,595 @@ const ApplicationDetail = () => {
 		return `Age: ${ageNumber !== null ? ageNumber : leader.dob || "Unknown"} (${label})`;
 	};
 
+	// Action handlers with loading state
+	const handleApprove = async () => {
+		setIsActionLoading(true);
+		try {
+			approveApplication(application.id);
+			navigate("/verified");
+		} catch (err) {
+			console.error(err);
+		} finally {
+			setIsActionLoading(false);
+		}
+	};
+
+	const handleReject = async () => {
+		setIsActionLoading(true);
+		try {
+			rejectApplication(application.id);
+			navigate("/applications");
+		} catch (err) {
+			console.error(err);
+		} finally {
+			setIsActionLoading(false);
+		}
+	};
+
+	const handleFlag = async () => {
+		setIsActionLoading(true);
+		try {
+			flagApplication(application.id);
+			navigate("/flagged");
+		} catch (err) {
+			console.error(err);
+		} finally {
+			setIsActionLoading(false);
+		}
+	};
+
 	return (
 		<DashboardLayout>
-			<div className="space-y-6">
-				{/* Header */}
-				<div className="flex items-start justify-between">
-					<div>
-						<Button
-							variant="ghost"
-							className="mb-2"
-							onClick={() => navigate(-1)}
-						>
-							<ArrowLeft className="w-4 h-4 mr-2" />
-							Back
-						</Button>
-						<h1 className="text-3xl md:text-4xl font-bold">
-							{application.organizationName}
-						</h1>
-						<p className="text-muted-foreground mt-1">
-							Application ID: {application.id} • Submitted:{" "}
-							{new Date(application.submittedAt).toLocaleDateString()}
-						</p>
-					</div>
-					<div className="flex items-center gap-2">
-						<Badge className={getRiskBadgeColor(riskAssessment.level)}>
-							{riskAssessment.level.toUpperCase()} RISK
-						</Badge>
-						<Badge variant="outline" className="text-lg px-3 py-1 font-bold">
-							Score: {riskAssessment.score}/100
-						</Badge>
-					</div>
-				</div>
-
-				<div className="grid gap-6 lg:grid-cols-3">
-					{/* Main Info */}
-					<div className="lg:col-span-2 space-y-6">
-						{/* Organization Details */}
-						<Card>
-							<CardHeader>
-								<CardTitle className="flex items-center gap-2">
-									<Building2 className="w-5 h-5" />
-									Organization Details
-								</CardTitle>
-							</CardHeader>
-							<CardContent className="grid gap-4 sm:grid-cols-2">
-								<div className="flex items-center gap-3">
-									<FileWarning className="w-4 h-4 text-muted-foreground" />
-									<div>
-										<p className="text-sm text-muted-foreground">
-											Registration Number
-										</p>
-										<p className="font-medium">
-											{application.registrationNumber || "Not provided"}
-										</p>
-									</div>
-								</div>
-								<div className="flex items-center gap-3">
-									<MapPin className="w-4 h-4 text-muted-foreground" />
-									<div>
-										<p className="text-sm text-muted-foreground">Location</p>
-										<p>
-											{application.city === application.country
-												? application.country
-												: `${application.city}, ${application.country}`}
-										</p>
-									</div>
-								</div>
-								<div className="flex items-center gap-3">
-									<Mail className="w-4 h-4 text-muted-foreground" />
-									<div>
-										<p className="text-sm text-muted-foreground">Email</p>
-										<p className="font-medium">{application.email}</p>
-									</div>
-								</div>
-								<div className="flex items-center gap-3">
-									<Phone className="w-4 h-4 text-muted-foreground" />
-									<div>
-										{application.phone && (
-											<>
-												<p className="text-sm text-muted-foreground">Phone</p>
-												<p>{application.phone}</p>
-											</>
-										)}
-									</div>
-								</div>
-								{application.website && (
-									<div className="flex items-center gap-3">
-										<Globe className="w-4 h-4 text-muted-foreground" />
-										<div>
-											<p className="text-sm text-muted-foreground">Website</p>
-											<p className="font-medium">{application.website}</p>
-										</div>
-									</div>
-								)}
-								<div className="flex items-center gap-3">
-									<Users className="w-4 h-4 text-muted-foreground" />
-									<div>
-										<p className="text-sm text-muted-foreground">
-											Member Count
-										</p>
-										<p className="font-medium">
-											{application.memberCount.toLocaleString()}
-										</p>
-									</div>
-								</div>
-								<div className="flex items-center gap-3">
-									<Calendar className="w-4 h-4 text-muted-foreground" />
-									<div>
-										<p className="text-sm text-muted-foreground">
-											Year Established
-										</p>
-										<p className="font-medium">
-											{application.yearEstablished
-												? new Date(application.yearEstablished).getFullYear() ||
-													application.yearEstablished
-												: "Not provided"}
-										</p>
-									</div>
-								</div>
-							</CardContent>
-						</Card>
-
-						{/* Mission Statement */}
-						<Card>
-							<CardHeader>
-								<CardTitle>Mission Statement</CardTitle>
-							</CardHeader>
-							<CardContent>
-								<p className="text-muted-foreground">
-									{application.missionStatement || "Not provided"}
+			<AnimatePresence mode="wait">
+				{isPageLoading ? (
+					<PageLoader message="Loading application details..." />
+				) : (
+					<motion.div
+						key="content"
+						initial={{ opacity: 0, y: 20 }}
+						animate={{ opacity: 1, y: 0 }}
+						transition={{ duration: 0.4 }}
+						className="space-y-6"
+					>
+						{/* Header */}
+						<div className="flex items-start justify-between">
+							<div>
+								<Button
+									variant="ghost"
+									className="mb-2"
+									onClick={() => navigate(-1)}
+								>
+									<ArrowLeft className="w-4 h-4 mr-2" />
+									Back
+								</Button>
+								<h1 className="text-3xl md:text-4xl font-bold">
+									{application.organizationName}
+								</h1>
+								<p className="text-muted-foreground mt-1">
+									Application ID: {application.id} • Submitted:{" "}
+									{new Date(application.submittedAt).toLocaleDateString()}
 								</p>
-							</CardContent>
-						</Card>
+							</div>
+							<div className="flex items-center gap-2">
+								<Badge className={getRiskBadgeColor(riskAssessment.level)}>
+									{riskAssessment.level.toUpperCase()} RISK
+								</Badge>
+								<Badge
+									variant="outline"
+									className="text-lg px-3 py-1 font-bold"
+								>
+									Score: {riskAssessment.score}/100
+								</Badge>
+							</div>
+						</div>
 
-						{/* Leadership – Improved rendering */}
-						<Card>
-							<CardHeader>
-								<CardTitle className="flex items-center gap-2">
-									<Users className="w-5 h-5" />
-									Leadership Team
-								</CardTitle>
-							</CardHeader>
-							<CardContent>
-								{validLeadership.length === 0 ? (
-									<p className="text-muted-foreground text-center py-4">
-										No leadership information available
-									</p>
-								) : (
-									<div className="space-y-4">
-										{validLeadership.map((leader, index) => (
-											<div
-												key={index}
-												className={`border rounded-lg p-5 bg-muted/30 space-y-2 shadow-sm ${
-													leader.isFinalDecisionMaker
-														? "border-blue-500 bg-blue-50/70"
-														: ""
-												}`}
-											>
-												<div className="flex items-center gap-3 flex-wrap">
-													<p className="font-semibold text-lg">{leader.name}</p>
-													{leader.isFinalDecisionMaker && (
-														<span className="text-sm text-blue-700 font-medium bg-blue-100 px-2.5 py-1 rounded-full">
-															Final Decision Maker
-														</span>
-													)}
-												</div>
-
-												{leader.role && (
-													<p className="text-sm font-medium text-gray-700">
-														{leader.role}
-													</p>
+						<div className="grid gap-6 lg:grid-cols-3">
+							{/* Main Info */}
+							<div className="lg:col-span-2 space-y-6">
+								{/* Organization Details */}
+								<Card>
+									<CardHeader>
+										<CardTitle className="flex items-center gap-2">
+											<Building2 className="w-5 h-5" />
+											Organization Details
+										</CardTitle>
+									</CardHeader>
+									<CardContent className="grid gap-4 sm:grid-cols-2">
+										<div className="flex items-center gap-3">
+											<FileWarning className="w-4 h-4 text-muted-foreground" />
+											<div>
+												<p className="text-sm text-muted-foreground">
+													Registration Number
+												</p>
+												<p className="font-medium">
+													{application.registrationNumber || "Not provided"}
+												</p>
+											</div>
+										</div>
+										<div className="flex items-center gap-3">
+											<MapPin className="w-4 h-4 text-muted-foreground" />
+											<div>
+												<p className="text-sm text-muted-foreground">
+													Location
+												</p>
+												<p>
+													{application.city === application.country
+														? application.country
+														: `${application.city}, ${application.country}`}
+												</p>
+											</div>
+										</div>
+										<div className="flex items-center gap-3">
+											<Mail className="w-4 h-4 text-muted-foreground" />
+											<div>
+												<p className="text-sm text-muted-foreground">Email</p>
+												<p className="font-medium">{application.email}</p>
+											</div>
+										</div>
+										<div className="flex items-center gap-3">
+											<Phone className="w-4 h-4 text-muted-foreground" />
+											<div>
+												{application.phone && (
+													<>
+														<p className="text-sm text-muted-foreground">
+															Phone
+														</p>
+														<p>{application.phone}</p>
+													</>
 												)}
-
-												<div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-													<span>{formatLeaderAgeLabel(leader)}</span>
-													{leader.hasId && (
-														<span className="text-green-600 font-medium">
-															✓ ID Verified
-														</span>
-													)}
+											</div>
+										</div>
+										{application.website && (
+											<div className="flex items-center gap-3">
+												<Globe className="w-4 h-4 text-muted-foreground" />
+												<div>
+													<p className="text-sm text-muted-foreground">
+														Website
+													</p>
+													<p className="font-medium">{application.website}</p>
 												</div>
 											</div>
-										))}
-									</div>
-								)}
-							</CardContent>
-						</Card>
-					</div>
-
-					{/* Sidebar - Risk Assessment */}
-					<div className="space-y-6">
-						{/* Risk Score */}
-						<Card className="border-2 border-primary/20">
-							<CardHeader>
-								<CardTitle className="flex items-center gap-2">
-									<Shield className="w-5 h-5" />
-									Risk Assessment
-								</CardTitle>
-							</CardHeader>
-							<CardContent className="space-y-4">
-								<div className="text-center p-6 bg-muted rounded-lg">
-									<p className="text-5xl font-bold">{riskAssessment.score}</p>
-									<p className="text-muted-foreground mt-1">Risk Score</p>
-									<Badge
-										className={`mt-3 text-base ${getRiskBadgeColor(
-											riskAssessment.level,
-										)}`}
-									>
-										{riskAssessment.level.toUpperCase()} RISK
-									</Badge>
-								</div>
-
-								<Separator />
-
-								<div className="space-y-3">
-									<h4 className="font-medium">Score Breakdown</h4>
-									<div className="space-y-2 text-sm">
-										<div className="flex justify-between">
-											<span>Sanctions Match</span>
-											<span
-												className={
-													riskAssessment.breakdown.sanctionsMatch > 0
-														? "text-destructive font-medium"
-														: ""
-												}
-											>
-												+{riskAssessment.breakdown.sanctionsMatch}
-											</span>
+										)}
+										<div className="flex items-center gap-3">
+											<Users className="w-4 h-4 text-muted-foreground" />
+											<div>
+												<p className="text-sm text-muted-foreground">
+													Member Count
+												</p>
+												<p className="font-medium">
+													{application.memberCount.toLocaleString()}
+												</p>
+											</div>
 										</div>
-										{/* ... other breakdown items remain the same ... */}
-										<div className="flex justify-between">
-											<span>Missing ID/Passport</span>
-											<span
-												className={
-													riskAssessment.breakdown.missingId > 0
-														? "text-yellow-600 font-medium"
-														: ""
-												}
-											>
-												+{riskAssessment.breakdown.missingId}
-											</span>
+										<div className="flex items-center gap-3">
+											<Calendar className="w-4 h-4 text-muted-foreground" />
+											<div>
+												<p className="text-sm text-muted-foreground">
+													Year Established
+												</p>
+												<p className="font-medium">
+													{application.yearEstablished
+														? new Date(
+																application.yearEstablished,
+															).getFullYear() || application.yearEstablished
+														: "Not provided"}
+												</p>
+											</div>
 										</div>
-										{/* Add the rest of your breakdown items here if you cut them */}
-									</div>
-								</div>
-							</CardContent>
-						</Card>
+									</CardContent>
+								</Card>
 
-						{/* Sanctions Check */}
-						<Card
-							className={
-								riskAssessment.sanctionMatches.length > 0
-									? "border-destructive bg-destructive/5"
-									: ""
-							}
-						>
-							<CardHeader>
-								<CardTitle className="flex items-center gap-2">
-									<AlertTriangle
-										className={`w-5 h-5 ${
-											riskAssessment.sanctionMatches.length > 0
-												? "text-destructive"
-												: ""
-										}`}
-									/>
-									Sanctions Check
-								</CardTitle>
-							</CardHeader>
-							<CardContent>
-								{riskAssessment.sanctionMatches.some(
-									(m) =>
-										m.inputName &&
-										m.sanctionedName &&
-										Number.isFinite(m.similarity),
-								) ? (
-									<div className="space-y-3">
-										{riskAssessment.sanctionMatches
-											.filter(
-												(m) =>
-													m.inputName &&
-													m.sanctionedName &&
-													Number.isFinite(m.similarity),
-											)
-											.map((match, index) => (
-												<div
-													key={index}
-													className="p-3 bg-destructive/10 rounded-lg text-sm"
-												>
-													<p className="font-medium text-destructive">
-														{`Sanctions Match Found: ${match.inputName}`}
-													</p>
-													<p>
-														<span className="text-muted-foreground">
-															Input:
-														</span>{" "}
-														{match.inputName}
-													</p>
-													<p>
-														<span className="text-muted-foreground">
-															Match:
-														</span>{" "}
-														{match.sanctionedName}
-													</p>
-													<p>
-														<span className="text-muted-foreground">
-															Similarity:
-														</span>{" "}
-														{(match.similarity * 100).toFixed(1)}%
-													</p>
-												</div>
-											))}
-									</div>
-								) : (
-									<div className="flex items-center gap-2 text-green-600">
-										<CheckCircle className="w-5 h-5" />
-										<span>No sanctions matches found</span>
-									</div>
-								)}
-							</CardContent>
-						</Card>
-
-						{/* Actions */}
-						{isActionable ? (
-							<Card>
-								<CardHeader>
-									<CardTitle>Actions</CardTitle>
-								</CardHeader>
-								<CardContent className="space-y-3">
-									<Button className="w-full" onClick={handleApprove}>
-										<CheckCircle className="w-4 h-4 mr-2" />
-										Approve Organization
-									</Button>
-									<Button
-										className="w-full"
-										variant="outline"
-										onClick={handleFlag}
-									>
-										<Flag className="w-4 h-4 mr-2" />
-										Flag for Investigation
-									</Button>
-									<Button
-										className="w-full"
-										variant="destructive"
-										onClick={handleReject}
-									>
-										<XCircle className="w-4 h-4 mr-2" />
-										Reject Application
-									</Button>
-								</CardContent>
-							</Card>
-						) : (
-							<Card>
-								<CardContent className="pt-6">
-									<div className="text-center">
-										<Badge
-											className={
-												application.status === "approved"
-													? "bg-green-100 text-green-800"
-													: application.status === "flagged"
-														? "bg-yellow-100 text-yellow-800"
-														: "bg-red-100 text-red-800"
-											}
-										>
-											{application.status.toUpperCase()}
-										</Badge>
-										<p className="text-sm text-muted-foreground mt-2">
-											This application has been processed
+								{/* Mission Statement */}
+								<Card>
+									<CardHeader>
+										<CardTitle>Mission Statement</CardTitle>
+									</CardHeader>
+									<CardContent>
+										<p className="text-muted-foreground">
+											{application.missionStatement || "Not provided"}
 										</p>
-									</div>
-								</CardContent>
-							</Card>
-						)}
-					</div>
-				</div>
-			</div>
+									</CardContent>
+								</Card>
+
+								{/* Leadership Team */}
+								<Card>
+									<CardHeader>
+										<CardTitle className="flex items-center gap-2">
+											<Users className="w-5 h-5" />
+											Leadership Team
+										</CardTitle>
+									</CardHeader>
+									<CardContent>
+										{validLeadership.length === 0 ? (
+											<p className="text-muted-foreground text-center py-4">
+												No leadership information available
+											</p>
+										) : (
+											<div className="space-y-4">
+												{validLeadership.map((leader, index) => (
+													<motion.div
+														key={index}
+														initial={{ opacity: 0, y: 10 }}
+														animate={{ opacity: 1, y: 0 }}
+														transition={{ delay: index * 0.08 }}
+														className={`border rounded-lg p-5 bg-muted/30 space-y-2 shadow-sm ${
+															leader.isFinalDecisionMaker
+																? "border-blue-500 bg-blue-50/70"
+																: ""
+														}`}
+													>
+														<div className="flex items-center gap-3 flex-wrap">
+															<p className="font-semibold text-lg">
+																{leader.name}
+															</p>
+															{leader.isFinalDecisionMaker && (
+																<span className="text-sm text-blue-700 font-medium bg-blue-100 px-2.5 py-1 rounded-full">
+																	Final Decision Maker
+																</span>
+															)}
+														</div>
+
+														{leader.role && (
+															<p className="text-sm font-medium text-gray-700">
+																{leader.role}
+															</p>
+														)}
+
+														<div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+															<span>{formatLeaderAgeLabel(leader)}</span>
+															{leader.hasId && (
+																<span className="text-green-600 font-medium">
+																	✓ ID Verified
+																</span>
+															)}
+														</div>
+													</motion.div>
+												))}
+											</div>
+										)}
+									</CardContent>
+								</Card>
+							</div>
+
+							{/* Sidebar - Risk Assessment */}
+							<div className="space-y-6">
+								{/* Risk Score */}
+								<Card className="border-2 border-primary/20">
+									<CardHeader>
+										<CardTitle className="flex items-center gap-2">
+											<Shield className="w-5 h-5" />
+											Risk Assessment
+										</CardTitle>
+									</CardHeader>
+									<CardContent className="space-y-4">
+										<div className="text-center p-6 bg-muted rounded-lg">
+											<p className="text-5xl font-bold">
+												{riskAssessment.score}
+											</p>
+											<p className="text-muted-foreground mt-1">Risk Score</p>
+											<Badge
+												className={`mt-3 text-base ${getRiskBadgeColor(
+													riskAssessment.level,
+												)}`}
+											>
+												{riskAssessment.level.toUpperCase()} RISK
+											</Badge>
+										</div>
+
+										<Separator />
+
+										<div className="space-y-3">
+											<h4 className="font-medium">Score Breakdown</h4>
+											<div className="space-y-2 text-sm">
+												<div className="flex justify-between">
+													<span>Sanctions Match</span>
+													<span
+														className={
+															riskAssessment.breakdown.sanctionsMatch > 0
+																? "text-destructive font-medium"
+																: ""
+														}
+													>
+														+{riskAssessment.breakdown.sanctionsMatch}
+													</span>
+												</div>
+												{/* ... other breakdown items ... */}
+												<div className="flex justify-between">
+													<span>Missing ID/Passport</span>
+													<span
+														className={
+															riskAssessment.breakdown.missingId > 0
+																? "text-yellow-600 font-medium"
+																: ""
+														}
+													>
+														+{riskAssessment.breakdown.missingId}
+													</span>
+												</div>
+												{/* Add the rest of your breakdown items here */}
+											</div>
+										</div>
+									</CardContent>
+								</Card>
+
+								{/* Sanctions Check */}
+								<Card
+									className={
+										riskAssessment.sanctionMatches.length > 0
+											? "border-destructive bg-destructive/5"
+											: ""
+									}
+								>
+									<CardHeader>
+										<CardTitle className="flex items-center gap-2">
+											<AlertTriangle
+												className={`w-5 h-5 ${
+													riskAssessment.sanctionMatches.length > 0
+														? "text-destructive"
+														: ""
+												}`}
+											/>
+											Sanctions Check
+										</CardTitle>
+									</CardHeader>
+									<CardContent>
+										<AnimatePresence mode="wait">
+											{isSanctionsLoading ? (
+												<motion.div
+													key="loading"
+													initial={{ opacity: 0 }}
+													animate={{ opacity: 1 }}
+													exit={{ opacity: 0 }}
+													className="space-y-4"
+												>
+													{/* Progress Bar Container */}
+													<div className="space-y-2">
+														<div className="flex justify-between text-sm">
+															<span className="font-medium text-muted-foreground">
+																Scanning UN Sanctions Databases...
+															</span>
+															<span className="font-semibold text-blue-600">
+																{Math.round(progress)}%
+															</span>
+														</div>
+														<div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+															<motion.div
+																className="h-full bg-blue-600 rounded-full"
+																initial={{ width: "0%" }}
+																animate={{ width: `${progress}%` }}
+																transition={{ type: "tween", duration: 0.1 }}
+															/>
+														</div>
+														<div className="flex justify-between text-xs text-muted-foreground">
+															<span>Initializing scan</span>
+															<span>Comparing against global watchlists</span>
+														</div>
+													</div>
+
+													{/* Scanning Steps */}
+													<div className="space-y-3 pt-2">
+														<div className="flex items-center gap-2 text-sm">
+															<div
+																className={`w-2 h-2 rounded-full ${progress > 20 ? "bg-green-500" : "bg-gray-300"}`}
+															/>
+															<span
+																className={
+																	progress > 20
+																		? "text-gray-800"
+																		: "text-gray-400"
+																}
+															>
+																Querying UN Security Council lists
+															</span>
+														</div>
+														<div className="flex items-center gap-2 text-sm">
+															<div
+																className={`w-2 h-2 rounded-full ${progress > 50 ? "bg-green-500" : "bg-gray-300"}`}
+															/>
+															<span
+																className={
+																	progress > 50
+																		? "text-gray-800"
+																		: "text-gray-400"
+																}
+															>
+																Checking OFAC and EU sanctions
+															</span>
+														</div>
+														<div className="flex items-center gap-2 text-sm">
+															<div
+																className={`w-2 h-2 rounded-full ${progress > 80 ? "bg-green-500" : "bg-gray-300"}`}
+															/>
+															<span
+																className={
+																	progress > 80
+																		? "text-gray-800"
+																		: "text-gray-400"
+																}
+															>
+																Verifying name similarity matches
+															</span>
+														</div>
+														<div className="flex items-center gap-2 text-sm">
+															<div
+																className={`w-2 h-2 rounded-full ${progress === 100 ? "bg-green-500" : "bg-gray-300"}`}
+															/>
+															<span
+																className={
+																	progress === 100
+																		? "text-gray-800"
+																		: "text-gray-400"
+																}
+															>
+																Finalizing results...
+															</span>
+														</div>
+													</div>
+												</motion.div>
+											) : (
+												<motion.div
+													key="content"
+													initial={{ opacity: 0, y: 10 }}
+													animate={{ opacity: 1, y: 0 }}
+													transition={{ duration: 0.5 }}
+												>
+													{riskAssessment.sanctionMatches.some(
+														(m) =>
+															m.inputName &&
+															m.sanctionedName &&
+															Number.isFinite(m.similarity),
+													) ? (
+														<div className="space-y-3">
+															<div className="flex items-center gap-2 text-destructive mb-2">
+																<AlertTriangle className="w-5 h-5" />
+																<span className="font-semibold">
+																	Sanctions Match Detected
+																</span>
+															</div>
+															{riskAssessment.sanctionMatches
+																.filter(
+																	(m) =>
+																		m.inputName &&
+																		m.sanctionedName &&
+																		Number.isFinite(m.similarity),
+																)
+																.map((match, index) => (
+																	<motion.div
+																		key={index}
+																		initial={{ opacity: 0, scale: 0.95 }}
+																		animate={{ opacity: 1, scale: 1 }}
+																		transition={{ delay: index * 0.1 }}
+																		className="p-4 bg-destructive/10 rounded-lg border border-destructive/20"
+																	>
+																		<p className="font-medium text-destructive mb-2">
+																			⚠️ Match Found: {match.inputName}
+																		</p>
+																		<div className="grid grid-cols-1 gap-2 text-sm">
+																			<div className="flex justify-between">
+																				<span className="text-muted-foreground">
+																					Input Name:
+																				</span>
+																				<span className="font-medium">
+																					{match.inputName}
+																				</span>
+																			</div>
+																			<div className="flex justify-between">
+																				<span className="text-muted-foreground">
+																					Sanctioned Name:
+																				</span>
+																				<span className="font-medium text-destructive">
+																					{match.sanctionedName}
+																				</span>
+																			</div>
+																			<div className="flex justify-between">
+																				<span className="text-muted-foreground">
+																					Match Confidence:
+																				</span>
+																				<span className="font-semibold">
+																					{(match.similarity * 100).toFixed(1)}%
+																				</span>
+																			</div>
+																		</div>
+																	</motion.div>
+																))}
+														</div>
+													) : (
+														<motion.div
+															initial={{ opacity: 0, scale: 0.95 }}
+															animate={{ opacity: 1, scale: 1 }}
+															transition={{ duration: 0.5 }}
+															className="flex flex-col items-center gap-4 p-6"
+														>
+															<div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+																<CheckCircle className="w-10 h-10 text-green-600" />
+															</div>
+															<div className="text-center space-y-1">
+																<h3 className="font-semibold text-green-700 text-lg">
+																	Clear
+																</h3>
+																<p className="text-sm text-muted-foreground">
+																	No sanctions matches found across all
+																	databases
+																</p>
+																<p className="text-xs text-muted-foreground">
+																	Verified against UN, OFAC, EU, and 12+ global
+																	watchlists
+																</p>
+															</div>
+														</motion.div>
+													)}
+												</motion.div>
+											)}
+										</AnimatePresence>
+									</CardContent>
+								</Card>
+
+								{/* Actions */}
+								{isActionable ? (
+									<Card className="relative">
+										<CardHeader>
+											<CardTitle>Actions</CardTitle>
+										</CardHeader>
+										<CardContent className="space-y-3">
+											{/* Buttons */}
+											<div
+												className={`${isActionLoading ? "opacity-60 pointer-events-none" : ""}`}
+											>
+												<Button className="w-full" onClick={handleApprove}>
+													<CheckCircle className="w-4 h-4 mr-2" />
+													Approve Organization
+												</Button>
+												<Button
+													className="w-full mt-3"
+													variant="outline"
+													onClick={handleFlag}
+												>
+													<Flag className="w-4 h-4 mr-2" />
+													Flag for Investigation
+												</Button>
+												<Button
+													className="w-full mt-3"
+													variant="destructive"
+													onClick={handleReject}
+												>
+													<XCircle className="w-4 h-4 mr-2" />
+													Reject Application
+												</Button>
+											</div>
+
+											{/* Loading overlay */}
+											<AnimatePresence>
+												{isActionLoading && <ActionLoadingOverlay />}
+											</AnimatePresence>
+										</CardContent>
+									</Card>
+								) : (
+									<Card>
+										<CardContent className="pt-6">
+											<div className="text-center">
+												<Badge
+													className={
+														application.status === "approved"
+															? "bg-green-100 text-green-800"
+															: application.status === "flagged"
+																? "bg-yellow-100 text-yellow-800"
+																: "bg-red-100 text-red-800"
+													}
+												>
+													{application.status.toUpperCase()}
+												</Badge>
+												<p className="text-sm text-muted-foreground mt-2">
+													This application has been processed
+												</p>
+											</div>
+										</CardContent>
+									</Card>
+								)}
+							</div>
+						</div>
+					</motion.div>
+				)}
+			</AnimatePresence>
 		</DashboardLayout>
 	);
 };
