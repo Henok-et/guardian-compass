@@ -5,7 +5,7 @@ import {
 	PageLoader,
 	ActionLoadingOverlay,
 } from "@/components/animation";
-
+import { toast } from "react-hot-toast";
 import { useParams, useNavigate } from "react-router-dom";
 import { useApplications } from "@/hooks/useApplications";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -28,11 +28,26 @@ import {
 	CheckCircle,
 	XCircle,
 	Flag,
-	User,
 	FileWarning,
+	Download,
+	AlertCircle,
 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
+import { applicationTracker } from "@/services/applicationTracker";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 const ApplicationDetail = () => {
 	const { id } = useParams<{ id: string }>();
 	const navigate = useNavigate();
@@ -41,6 +56,7 @@ const ApplicationDetail = () => {
 		approveApplication,
 		rejectApplication,
 		flagApplication,
+		refetch,
 		isLoading: hookIsLoading,
 	} = useApplications();
 
@@ -49,6 +65,22 @@ const ApplicationDetail = () => {
 	const [isActionLoading, setIsActionLoading] = useState(false);
 	const [isSanctionsLoading, setIsSanctionsLoading] = useState(true);
 	const [progress, setProgress] = useState(0);
+
+	// Dialog states
+	const [showFlagDialog, setShowFlagDialog] = useState(false);
+	const [showRejectDialog, setShowRejectDialog] = useState(false);
+	const [flagNotes, setFlagNotes] = useState("");
+	const [rejectReason, setRejectReason] = useState("");
+
+	// Duplicate alert
+	const [showDuplicateAlert, setShowDuplicateAlert] = useState(false);
+	const [duplicateInfo, setDuplicateInfo] = useState<{
+		isDuplicate: boolean;
+		previousStatus?: "approved" | "flagged" | "rejected";
+		previousDate?: string;
+		matchingRecord?: any;
+		reason?: string;
+	} | null>(null);
 
 	// Simulate loading delays (replace with your actual API calls)
 	useEffect(() => {
@@ -98,6 +130,47 @@ const ApplicationDetail = () => {
 	}, [isPageLoading]);
 
 	const application = getApplicationById(id || "");
+
+	// Check for duplicates on load
+	useEffect(() => {
+		if (application) {
+			const duplicateCheck = applicationTracker.checkForDuplicates(application);
+			if (duplicateCheck.isDuplicate) {
+				// Non-blocking warning toast (generic call - no TS error)
+				toast(
+					<div className="text-sm">
+						<strong>⚠️ Potential Duplicate Detected</strong>
+						<br />
+						Similar to a previously{" "}
+						{duplicateCheck.previousStatus?.toUpperCase()} application
+						<br />
+						Date:{" "}
+						{duplicateCheck.previousDate
+							? new Date(duplicateCheck.previousDate).toLocaleDateString()
+							: "Unknown"}
+						<br />
+						<small>
+							{duplicateCheck.reason ||
+								"Please review carefully before taking action."}
+						</small>
+					</div>,
+					{
+						icon: "⚠️",
+						style: {
+							border: "1px solid #fbbf24",
+							background: "#fef3c7",
+							color: "#92400e",
+						},
+						duration: 10000,
+						position: "top-center",
+					},
+				);
+
+				// Keep state for inline banner
+				setDuplicateInfo(duplicateCheck);
+			}
+		}
+	}, [application]);
 
 	if (hookIsLoading || isPageLoading) {
 		return (
@@ -161,26 +234,31 @@ const ApplicationDetail = () => {
 		return `Age: ${ageNumber !== null ? ageNumber : leader.dob || "Unknown"} (${label})`;
 	};
 
-	// Action handlers with loading state
+	// Enhanced action handlers with tracking
 	const handleApprove = async () => {
 		setIsActionLoading(true);
 		try {
+			// Update in your main applications hook
 			approveApplication(application.id);
+
+			// Track the approval
+			applicationTracker.trackAction(
+				application,
+				"approved",
+				"Application approved",
+			);
+
+			// Refresh all lists (this makes approved item disappear from pending)
+			refetch();
+
+			// Show success message (using toast instead of alert - better UX)
+			toast.success("Organization approved successfully!");
+
+			// Navigate to approved page
 			navigate("/verified");
 		} catch (err) {
 			console.error(err);
-		} finally {
-			setIsActionLoading(false);
-		}
-	};
-
-	const handleReject = async () => {
-		setIsActionLoading(true);
-		try {
-			rejectApplication(application.id);
-			navigate("/applications");
-		} catch (err) {
-			console.error(err);
+			toast.error("Error approving application");
 		} finally {
 			setIsActionLoading(false);
 		}
@@ -189,17 +267,136 @@ const ApplicationDetail = () => {
 	const handleFlag = async () => {
 		setIsActionLoading(true);
 		try {
+			// Update in your main applications hook
 			flagApplication(application.id);
+
+			// Track the flagging
+			applicationTracker.trackAction(
+				application,
+				"flagged",
+				flagNotes || "Flagged for investigation",
+			);
+
+			// Refresh lists
+			refetch();
+
+			// Success message
+			toast.success("Application flagged for investigation!");
+
+			// Navigate to flagged page
 			navigate("/flagged");
 		} catch (err) {
 			console.error(err);
+			toast.error("Error flagging application");
 		} finally {
 			setIsActionLoading(false);
+			setShowFlagDialog(false);
+			setFlagNotes("");
 		}
+	};
+
+	const handleReject = async () => {
+		setIsActionLoading(true);
+		try {
+			// Update in your main applications hook
+			rejectApplication(application.id);
+
+			// Track the rejection
+			applicationTracker.trackAction(
+				application,
+				"rejected",
+				rejectReason || "Application rejected",
+			);
+
+			// Refresh lists
+			refetch();
+
+			// Success message
+			toast.success("Application rejected!");
+
+			// Navigate back to applications
+			navigate("/applications");
+		} catch (err) {
+			console.error(err);
+			toast.error("Error rejecting application");
+		} finally {
+			setIsActionLoading(false);
+			setShowRejectDialog(false);
+			setRejectReason("");
+		}
+	};
+
+	// Export function
+	const handleExport = (type: "approved" | "flagged" | "rejected" | "all") => {
+		applicationTracker.exportToExcel(type);
 	};
 
 	return (
 		<DashboardLayout>
+			{/* Flag Dialog */}
+			<AlertDialog open={showFlagDialog} onOpenChange={setShowFlagDialog}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Flag for Investigation</AlertDialogTitle>
+						<AlertDialogDescription>
+							Please provide details about why this application needs
+							investigation.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<div className="space-y-3">
+						<Label htmlFor="flag-notes">Investigation Notes</Label>
+						<Textarea
+							id="flag-notes"
+							placeholder="Enter details about suspicious activity, missing information, or concerns..."
+							value={flagNotes}
+							onChange={(e) => setFlagNotes(e.target.value)}
+							rows={4}
+						/>
+					</div>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={handleFlag}
+							disabled={!flagNotes.trim()}
+						>
+							Flag Application
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			{/* Reject Dialog */}
+			<AlertDialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Reject Application</AlertDialogTitle>
+						<AlertDialogDescription>
+							Please provide the reason for rejection. This will help with
+							future reference.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<div className="space-y-3">
+						<Label htmlFor="reject-reason">Rejection Reason</Label>
+						<Textarea
+							id="reject-reason"
+							placeholder="Enter reason for rejection (e.g., incomplete information, high risk, sanctions match...)"
+							value={rejectReason}
+							onChange={(e) => setRejectReason(e.target.value)}
+							rows={4}
+						/>
+					</div>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={handleReject}
+							disabled={!rejectReason.trim()}
+						>
+							Reject Application
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
 			<AnimatePresence mode="wait">
 				{isPageLoading ? (
 					<PageLoader message="Loading application details..." />
@@ -242,6 +439,38 @@ const ApplicationDetail = () => {
 								</Badge>
 							</div>
 						</div>
+
+						{duplicateInfo?.isDuplicate && (
+							<div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+								<div className="flex items-start gap-3">
+									<AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+									<div>
+										<p className="font-medium text-amber-800">
+											Potential Duplicate Detected
+										</p>
+										<p className="text-sm text-amber-700 mt-1">
+											Similar to a previously{" "}
+											{duplicateInfo.previousStatus?.toUpperCase()} application
+											on{" "}
+											{duplicateInfo.previousDate
+												? new Date(
+														duplicateInfo.previousDate,
+													).toLocaleDateString()
+												: "unknown date"}
+											.
+										</p>
+										{duplicateInfo.reason && (
+											<p className="text-sm text-amber-700 mt-1">
+												{duplicateInfo.reason}
+											</p>
+										)}
+										<p className="text-sm text-amber-700 mt-2">
+											Please review carefully before taking action.
+										</p>
+									</div>
+								</div>
+							</div>
+						)}
 
 						<div className="grid gap-6 lg:grid-cols-3">
 							{/* Main Info */}
@@ -530,7 +759,9 @@ const ApplicationDetail = () => {
 													<div className="space-y-3 pt-2">
 														<div className="flex items-center gap-2 text-sm">
 															<div
-																className={`w-2 h-2 rounded-full ${progress > 20 ? "bg-green-500" : "bg-gray-300"}`}
+																className={`w-2 h-2 rounded-full ${
+																	progress > 20 ? "bg-green-500" : "bg-gray-300"
+																}`}
 															/>
 															<span
 																className={
@@ -544,7 +775,9 @@ const ApplicationDetail = () => {
 														</div>
 														<div className="flex items-center gap-2 text-sm">
 															<div
-																className={`w-2 h-2 rounded-full ${progress > 50 ? "bg-green-500" : "bg-gray-300"}`}
+																className={`w-2 h-2 rounded-full ${
+																	progress > 50 ? "bg-green-500" : "bg-gray-300"
+																}`}
 															/>
 															<span
 																className={
@@ -558,7 +791,9 @@ const ApplicationDetail = () => {
 														</div>
 														<div className="flex items-center gap-2 text-sm">
 															<div
-																className={`w-2 h-2 rounded-full ${progress > 80 ? "bg-green-500" : "bg-gray-300"}`}
+																className={`w-2 h-2 rounded-full ${
+																	progress > 80 ? "bg-green-500" : "bg-gray-300"
+																}`}
 															/>
 															<span
 																className={
@@ -572,7 +807,11 @@ const ApplicationDetail = () => {
 														</div>
 														<div className="flex items-center gap-2 text-sm">
 															<div
-																className={`w-2 h-2 rounded-full ${progress === 100 ? "bg-green-500" : "bg-gray-300"}`}
+																className={`w-2 h-2 rounded-full ${
+																	progress === 100
+																		? "bg-green-500"
+																		: "bg-gray-300"
+																}`}
 															/>
 															<span
 																className={
@@ -687,13 +926,26 @@ const ApplicationDetail = () => {
 								{/* Actions */}
 								{isActionable ? (
 									<Card className="relative">
-										<CardHeader>
+										<CardHeader className="flex flex-row items-center justify-between">
 											<CardTitle>Actions</CardTitle>
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={() => handleExport("all")}
+												className="gap-2"
+											>
+												<Download className="w-4 h-4" />
+												Export All
+											</Button>
 										</CardHeader>
 										<CardContent className="space-y-3">
 											{/* Buttons */}
 											<div
-												className={`${isActionLoading ? "opacity-60 pointer-events-none" : ""}`}
+												className={`${
+													isActionLoading
+														? "opacity-60 pointer-events-none"
+														: ""
+												}`}
 											>
 												<Button className="w-full" onClick={handleApprove}>
 													<CheckCircle className="w-4 h-4 mr-2" />
@@ -702,7 +954,7 @@ const ApplicationDetail = () => {
 												<Button
 													className="w-full mt-3"
 													variant="outline"
-													onClick={handleFlag}
+													onClick={() => setShowFlagDialog(true)}
 												>
 													<Flag className="w-4 h-4 mr-2" />
 													Flag for Investigation
@@ -710,7 +962,7 @@ const ApplicationDetail = () => {
 												<Button
 													className="w-full mt-3"
 													variant="destructive"
-													onClick={handleReject}
+													onClick={() => setShowRejectDialog(true)}
 												>
 													<XCircle className="w-4 h-4 mr-2" />
 													Reject Application
@@ -741,6 +993,25 @@ const ApplicationDetail = () => {
 												<p className="text-sm text-muted-foreground mt-2">
 													This application has been processed
 												</p>
+												<Button
+													variant="outline"
+													size="sm"
+													className="mt-3 gap-2"
+													onClick={() =>
+														handleExport(
+															application.status as
+																| "approved"
+																| "flagged"
+																| "rejected",
+														)
+													}
+												>
+													<Download className="w-4 h-4" />
+													Export{" "}
+													{application.status.charAt(0).toUpperCase() +
+														application.status.slice(1)}{" "}
+													Applications
+												</Button>
 											</div>
 										</CardContent>
 									</Card>

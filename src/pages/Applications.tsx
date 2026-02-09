@@ -5,25 +5,32 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { ArrowRight, MapPin, Users, Search } from "lucide-react";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { LoadingSpinner } from "@/components/animation"; // adjust path
 
 const Applications = () => {
-	const { applications, isLoading } = useApplications();
-	const [searchQuery, setSearchQuery] = React.useState("");
-	const [riskFilter, setRiskFilter] = React.useState<
-		"all" | "low" | "medium" | "high"
+	const { applications, isLoading, refetch } = useApplications();
+	const [searchQuery, setSearchQuery] = useState("");
+	const [riskFilter, setRiskFilter] = useState<
+		"all" | "low" | "medium" | "high" | "critical"
 	>("all");
 
-	// Debug: log what the hook is really providing
+	// Refetch fresh data when entering this page (fixes stale list after approval)
 	useEffect(() => {
-		console.log("[LIST PAGE] Received from hook - total:", applications.length);
+		refetch();
+		console.log("[Applications Page] Refetched data on mount");
+	}, [refetch]);
+
+	// Debug: log what the hook provides
+	useEffect(() => {
+		console.log("[LIST PAGE] Total apps from hook:", applications.length);
 		console.log(
 			"[LIST PAGE] Org names:",
 			applications.map((a) => a.organizationName || "Unnamed"),
 		);
 		console.log(
-			"[LIST PAGE] Leader counts:",
-			applications.map((a) => a.leadership?.length || 0),
+			"[LIST PAGE] Statuses:",
+			applications.map((a) => a.status),
 		);
 		console.log(
 			"[LIST PAGE] Risk levels:",
@@ -31,29 +38,34 @@ const Applications = () => {
 		);
 	}, [applications]);
 
+	// Filter ONLY pending applications + search + risk
+	const pendingApps = applications.filter((app) => app.status === "pending");
+
+	const filteredApplications = pendingApps.filter((app) => {
+		const matchesSearch =
+			app.organizationName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+			app.country.toLowerCase().includes(searchQuery.toLowerCase());
+
+		const matchesRisk =
+			riskFilter === "all" ? true : app.riskAssessment?.level === riskFilter;
+
+		return matchesSearch && matchesRisk;
+	});
+
 	if (isLoading) {
 		return (
 			<DashboardLayout>
 				<div className="flex items-center justify-center h-64">
-					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+					<LoadingSpinner size="lg" />
 				</div>
 			</DashboardLayout>
 		);
 	}
 
-	const filteredApplications = applications.filter((app) => {
-		const matchesSearch =
-			app.organizationName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			app.country.toLowerCase().includes(searchQuery.toLowerCase());
-		const matchesRisk =
-			riskFilter === "all" ? true : app.riskAssessment?.level === riskFilter;
-		return matchesSearch && matchesRisk;
-	});
-
 	return (
 		<DashboardLayout>
 			<div className="space-y-6">
-				<h1 className="text-3xl font-bold">Applications</h1>
+				<h1 className="text-3xl font-bold">Pending Applications</h1>
 				<p className="text-muted-foreground">
 					Review and process youth organization applications
 				</p>
@@ -72,32 +84,30 @@ const Applications = () => {
 
 				{/* Risk Filter */}
 				<div className="flex gap-2 mt-2">
-					{(["all", "low", "medium", "high"] as const).map((level) => (
-						<button
-							key={level}
-							onClick={() => setRiskFilter(level)}
-							className={`px-3 py-1 rounded text-sm font-medium border ${
-								riskFilter === level
-									? "bg-primary text-white border-primary"
-									: "bg-white text-muted-foreground border-gray-300"
-							}`}
-						>
-							{level === "all"
-								? "All"
-								: level === "low"
-									? "Low Risk"
-									: level === "medium"
-										? "Medium Risk"
-										: "High Risk"}
-						</button>
-					))}
+					{(["all", "low", "medium", "high", "critical"] as const).map(
+						(level) => (
+							<button
+								key={level}
+								onClick={() => setRiskFilter(level)}
+								className={`px-3 py-1 rounded text-sm font-medium border ${
+									riskFilter === level
+										? "bg-primary text-white border-primary"
+										: "bg-white text-muted-foreground border-gray-300"
+								}`}
+							>
+								{level === "all"
+									? "All"
+									: level.charAt(0).toUpperCase() + level.slice(1) + " Risk"}
+							</button>
+						),
+					)}
 				</div>
 
 				{/* Applications Grid */}
 				<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
 					{filteredApplications.length === 0 ? (
 						<p className="text-center text-muted-foreground col-span-full py-8">
-							No applications found
+							No pending applications found
 						</p>
 					) : (
 						filteredApplications.map((app) => (
@@ -128,7 +138,22 @@ const Applications = () => {
 											{app.leadership?.length !== 1 ? "s" : ""}
 										</div>
 
-										{/* Full-width separator line */}
+										{/* Status Badge */}
+										<Badge
+											className={`mt-2 ${
+												app.status === "pending"
+													? "bg-blue-100 text-blue-800"
+													: app.status === "approved"
+														? "bg-green-100 text-green-800"
+														: app.status === "flagged"
+															? "bg-yellow-100 text-yellow-800"
+															: "bg-red-100 text-red-800"
+											}`}
+										>
+											{app.status.toUpperCase()}
+										</Badge>
+
+										{/* Full-width separator */}
 										<hr className="my-2 border-t border-gray-200 w-full" />
 
 										{/* Risk Score */}
@@ -145,7 +170,9 @@ const Applications = () => {
 													? "bg-red-100 text-red-800 border border-red-200"
 													: app.riskAssessment.level === "medium"
 														? "bg-yellow-100 text-yellow-800 border border-yellow-200"
-														: "bg-green-100 text-green-800 border border-green-200"
+														: app.riskAssessment.level === "critical"
+															? "bg-red-900 text-white border border-red-900"
+															: "bg-green-100 text-green-800 border border-green-200"
 											}`}
 										>
 											{app.riskAssessment.level.toUpperCase()}

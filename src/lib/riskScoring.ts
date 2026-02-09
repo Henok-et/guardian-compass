@@ -52,6 +52,7 @@ export interface RiskBreakdown {
 	countryRisk: number;
 	invalidData: number;
 	total: number;
+	[key: string]: number;
 }
 
 export interface BreakdownReason {
@@ -69,7 +70,7 @@ export interface BreakdownReason {
 
 export interface RiskAssessment {
 	score: number;
-	level: "low" | "medium" | "high";
+	level: "low" | "medium" | "high" | "critical";
 	breakdown: RiskBreakdown;
 	reasons: BreakdownReason[];
 	// Normalize to UI-friendly shape
@@ -585,18 +586,24 @@ export async function calculateRiskScore(
 	}
 
 	// TOTAL & LEVEL
+	// TOTAL & LEVEL
+	// TOTAL & LEVEL
 	breakdown.total = Object.values(breakdown).reduce(
 		(sum, v) => sum + (typeof v === "number" ? v : 0),
 		0,
 	);
 	const score = Math.min(breakdown.total, 100);
-	let level: "low" | "medium" | "high" = "low";
+	let level: "low" | "medium" | "high" | "critical" = "low";
+
+	// Determine risk level with "critical" criteria
 	if (
-		score >= 70 ||
+		score >= 85 ||
 		sanctionMatches.length > 0 ||
-		invalidAgeCount > 0 ||
-		breakdown.countryRisk > 0
+		invalidAgeCount > 2 ||
+		(breakdown.countryRisk > 0 && breakdown.sanctionsMatch > 0)
 	) {
+		level = "critical";
+	} else if (score >= 70 || invalidAgeCount > 0 || breakdown.countryRisk > 0) {
 		level = "high";
 	} else if (score >= 30) {
 		level = "medium";
@@ -613,7 +620,9 @@ export async function calculateRiskScore(
 
 /* ===================== UTILS ===================== */
 
-export function getRiskBadgeColor(level: "low" | "medium" | "high"): string {
+export function getRiskBadgeColor(
+	level: "low" | "medium" | "high" | "critical",
+): string {
 	switch (level) {
 		case "low":
 			return "bg-green-100 text-green-800 border-green-200";
@@ -621,6 +630,8 @@ export function getRiskBadgeColor(level: "low" | "medium" | "high"): string {
 			return "bg-yellow-100 text-yellow-800 border-yellow-200";
 		case "high":
 			return "bg-red-100 text-red-800 border-red-200";
+		case "critical":
+			return "bg-red-900 text-white border-red-900"; // Dark red for critical
 	}
 }
 
