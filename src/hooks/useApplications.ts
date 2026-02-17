@@ -15,10 +15,13 @@ const FLAGGED_KEY = "au_flagged_applications";
 const REJECTED_KEY = "au_rejected_applications";
 
 export function useApplications() {
-	const [applications, setApplications] = useState<Application[]>([]);
-	const [verifiedOrgs, setVerifiedOrgs] = useState<Application[]>([]);
-	const [flaggedApps, setFlaggedApps] = useState<Application[]>([]);
-	const [rejectedApps, setRejectedApps] = useState<Application[]>([]);
+	const [allApplications, setAllApplications] = useState<ApplicationWithRisk[]>(
+		[],
+	);
+	const [applications, setApplications] = useState<ApplicationWithRisk[]>([]);
+	const [verifiedOrgs, setVerifiedOrgs] = useState<ApplicationWithRisk[]>([]);
+	const [flaggedApps, setFlaggedApps] = useState<ApplicationWithRisk[]>([]);
+	const [rejectedApps, setRejectedApps] = useState<ApplicationWithRisk[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
@@ -51,12 +54,16 @@ export function useApplications() {
 				}),
 			);
 
+			// Store ALL applications
+			setAllApplications(appsWithRisk);
+
 			// Only keep pending applications in the main list
 			setApplications(appsWithRisk.filter((a) => a.status === "pending"));
 		} catch (err: unknown) {
 			console.error("Failed to load applications:", err);
 			const message = err instanceof Error ? err.message : "Unknown error";
 			setError(`Failed to load applications: ${message}`);
+			setAllApplications([]);
 			setApplications([]);
 		} finally {
 			setIsLoading(false);
@@ -66,17 +73,17 @@ export function useApplications() {
 		try {
 			const storedVerified = localStorage.getItem(VERIFIED_KEY);
 			if (storedVerified) {
-				setVerifiedOrgs(JSON.parse(storedVerified) as Application[]);
+				setVerifiedOrgs(JSON.parse(storedVerified) as ApplicationWithRisk[]);
 			}
 
 			const storedFlagged = localStorage.getItem(FLAGGED_KEY);
 			if (storedFlagged) {
-				setFlaggedApps(JSON.parse(storedFlagged) as Application[]);
+				setFlaggedApps(JSON.parse(storedFlagged) as ApplicationWithRisk[]);
 			}
 
 			const storedRejected = localStorage.getItem(REJECTED_KEY);
 			if (storedRejected) {
-				setRejectedApps(JSON.parse(storedRejected) as Application[]);
+				setRejectedApps(JSON.parse(storedRejected) as ApplicationWithRisk[]);
 			}
 		} catch (err) {
 			console.error("Error loading workflow states:", err);
@@ -100,12 +107,18 @@ export function useApplications() {
 	// ── Actions ────────────────────────────────────────────────
 
 	const approveApplication = useCallback((id: string) => {
+		setAllApplications((prev) =>
+			prev.map((app) =>
+				app.id === id ? { ...app, status: "approved" as const } : app,
+			),
+		);
+
 		setApplications((prev) => {
 			const newApps = [...prev];
 			const appIndex = newApps.findIndex((a) => a.id === id);
 			if (appIndex === -1) return prev;
 
-			const appCopy = structuredClone(newApps[appIndex]) as Application;
+			const appCopy = structuredClone(newApps[appIndex]) as ApplicationWithRisk;
 			appCopy.status = "approved";
 
 			newApps.splice(appIndex, 1);
@@ -117,12 +130,18 @@ export function useApplications() {
 	}, []);
 
 	const rejectApplication = useCallback((id: string) => {
+		setAllApplications((prev) =>
+			prev.map((app) =>
+				app.id === id ? { ...app, status: "rejected" as const } : app,
+			),
+		);
+
 		setApplications((prev) => {
 			const newApps = [...prev];
 			const appIndex = newApps.findIndex((a) => a.id === id);
 			if (appIndex === -1) return prev;
 
-			const appCopy = structuredClone(newApps[appIndex]) as Application;
+			const appCopy = structuredClone(newApps[appIndex]) as ApplicationWithRisk;
 			appCopy.status = "rejected";
 
 			newApps.splice(appIndex, 1);
@@ -134,12 +153,18 @@ export function useApplications() {
 	}, []);
 
 	const flagApplication = useCallback((id: string) => {
+		setAllApplications((prev) =>
+			prev.map((app) =>
+				app.id === id ? { ...app, status: "flagged" as const } : app,
+			),
+		);
+
 		setApplications((prev) => {
 			const newApps = [...prev];
 			const appIndex = newApps.findIndex((a) => a.id === id);
 			if (appIndex === -1) return prev;
 
-			const appCopy = structuredClone(newApps[appIndex]) as Application;
+			const appCopy = structuredClone(newApps[appIndex]) as ApplicationWithRisk;
 			appCopy.status = "flagged";
 
 			newApps.splice(appIndex, 1);
@@ -173,17 +198,21 @@ export function useApplications() {
 	// ── Stats ──────────────────────────────────────────────────
 
 	const stats = {
-		total:
-			applications.length +
-			verifiedOrgs.length +
-			flaggedApps.length +
-			rejectedApps.length,
-		pending: applications.length, // already filtered
+		// Combine ALL sources for total count
+		total: allApplications.length,
+		// Pending from server
+		pending: applications.length,
+		// Approved from localStorage
 		approved: verifiedOrgs.length,
+		// Flagged from localStorage
 		flagged: flaggedApps.length,
+		// Rejected from localStorage
 		rejected: rejectedApps.length,
-		highRisk: applications.filter(
-			(a) => "riskAssessment" in a && a.riskAssessment?.level === "high",
+		// High risk from allApplications
+		highRisk: allApplications.filter(
+			(a) =>
+				a.riskAssessment?.level === "high" ||
+				a.riskAssessment?.level === "critical",
 		).length,
 	};
 
@@ -196,7 +225,9 @@ export function useApplications() {
 	}, [loadData]);
 
 	return {
-		applications,
+		// For dashboard: use allApplications to get everything
+		applications: allApplications, // Return ALL apps for dashboard stats
+		pendingApplications: applications, // Only pending apps for review
 		verifiedOrgs,
 		flaggedApps,
 		rejectedApps,
