@@ -5,418 +5,371 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
-	FileText,
-	Clock,
-	CheckCircle,
-	AlertTriangle,
-	ArrowRight,
-	Globe,
-	Eye,
-} from "lucide-react";
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+} from "recharts";
+import { Globe, Clock, Eye, Users, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 
-// African countries list
+// African countries list (unchanged)
 const AFRICAN_COUNTRIES = [
-	"Algeria",
-	"Angola",
-	"Benin",
-	"Botswana",
-	"Burkina Faso",
-	"Burundi",
-	"Cabo Verde",
-	"Cameroon",
-	"Central African Republic",
-	"Chad",
-	"Comoros",
-	"Congo",
-	"Côte d'Ivoire",
-	"Djibouti",
-	"Egypt",
-	"Equatorial Guinea",
-	"Eritrea",
-	"Eswatini",
-	"Ethiopia",
-	"Gabon",
-	"Gambia",
-	"Ghana",
-	"Guinea",
-	"Guinea-Bissau",
-	"Kenya",
-	"Lesotho",
-	"Liberia",
-	"Libya",
-	"Madagascar",
-	"Malawi",
-	"Mali",
-	"Mauritania",
-	"Mauritius",
-	"Morocco",
-	"Mozambique",
-	"Namibia",
-	"Niger",
-	"Nigeria",
-	"Rwanda",
-	"São Tomé and Príncipe",
-	"Senegal",
-	"Seychelles",
-	"Sierra Leone",
-	"Somalia",
-	"South Africa",
-	"South Sudan",
-	"Sudan",
-	"Tanzania",
-	"Togo",
-	"Tunisia",
-	"Uganda",
-	"Zambia",
-	"Zimbabwe",
+  "Algeria", "Angola", "Benin", "Botswana", "Burkina Faso", "Burundi",
+  "Cabo Verde", "Cameroon", "Central African Republic", "Chad", "Comoros",
+  "Congo", "Côte d'Ivoire", "Djibouti", "Egypt", "Equatorial Guinea",
+  "Eritrea", "Eswatini", "Ethiopia", "Gabon", "Gambia", "Ghana",
+  "Guinea", "Guinea-Bissau", "Kenya", "Lesotho", "Liberia", "Libya",
+  "Madagascar", "Malawi", "Mali", "Mauritania", "Mauritius", "Morocco",
+  "Mozambique", "Namibia", "Niger", "Nigeria", "Rwanda",
+  "São Tomé and Príncipe", "Senegal", "Seychelles", "Sierra Leone",
+  "Somalia", "South Africa", "South Sudan", "Sudan", "Tanzania", "Togo",
+  "Tunisia", "Uganda", "Zambia", "Zimbabwe",
 ];
 
+// Colors for charts
+const COLORS = {
+  approved: "#22c55e",
+  pending: "#eab308",
+  rejected: "#ef4444",
+  flagged: "#f97316",
+  country: "#3b82f6",
+};
+
 const Dashboard = () => {
-	const { applications, isLoading } = useApplications();
-	const [selectedCountry, setSelectedCountry] = useState<string>("all");
+  const { applications, isLoading } = useApplications();
+  const [selectedCountry, setSelectedCountry] = useState<string>("all");
 
-	// Local stats calculation - MORE RELIABLE
-	const [localStats, setLocalStats] = useState({
-		total: 0,
-		pending: 0,
-		approved: 0,
-		flagged: 0,
-		rejected: 0,
-		highRisk: 0,
-	});
+  // Calculate stats
+  const stats = useMemo(() => {
+    const total = applications.length;
+    const approved = applications.filter((a) => a.status === "approved").length;
+    const pending = applications.filter((a) => a.status === "pending").length;
+    const rejected = applications.filter((a) => a.status === "rejected").length;
+    const flagged = applications.filter((a) => a.status === "flagged").length;
 
-	// Calculate stats whenever applications change
-	useEffect(() => {
-		if (applications.length > 0) {
-			// Debug: Log what we're working with
-			console.log("Dashboard applications:", applications);
-			console.log(
-				"Application statuses:",
-				applications.map((app) => ({
-					id: app.id,
-					name: app.organizationName,
-					status: app.status,
-					riskLevel: app.riskAssessment?.level,
-				})),
-			);
+    return { total, approved, pending, rejected, flagged };
+  }, [applications]);
 
-			const stats = {
-				total: applications.length,
-				pending: applications.filter((app) => app.status === "pending").length,
-				approved: applications.filter((app) => app.status === "approved")
-					.length,
-				flagged: applications.filter((app) => app.status === "flagged").length,
-				rejected: applications.filter((app) => app.status === "rejected")
-					.length,
-				highRisk: applications.filter(
-					(app) =>
-						app.riskAssessment?.level === "high" ||
-						app.riskAssessment?.level === "critical",
-				).length,
-			};
+  // Data for status pie chart
+  const statusData = useMemo(() => {
+    return [
+      { name: "Approved", value: stats.approved, color: COLORS.approved },
+      { name: "Pending", value: stats.pending, color: COLORS.pending },
+      { name: "Rejected", value: stats.rejected, color: COLORS.rejected },
+      { name: "Flagged", value: stats.flagged, color: COLORS.flagged },
+    ].filter((item) => item.value > 0);
+  }, [stats]);
 
-			console.log("Calculated local stats:", stats);
-			setLocalStats(stats);
-		} else {
-			setLocalStats({
-				total: 0,
-				pending: 0,
-				approved: 0,
-				flagged: 0,
-				rejected: 0,
-				highRisk: 0,
-			});
-		}
-	}, [applications]);
+  // Data for country bar chart
+  const countryData = useMemo(() => {
+    const countryMap = new Map<string, number>();
+    applications.forEach((app) => {
+      if (app.country) {
+        const count = countryMap.get(app.country) || 0;
+        countryMap.set(app.country, count + 1);
+      }
+    });
+    // Convert to array, sort by count descending, take top 10
+    return Array.from(countryMap.entries())
+      .map(([country, count]) => ({ country, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+  }, [applications]);
 
-	// Filter applications based on selected country
-	const filteredApplications = useMemo(() => {
-		if (selectedCountry === "all" || !selectedCountry) {
-			return applications;
-		}
-		return applications.filter((app) => app.country === selectedCountry);
-	}, [applications, selectedCountry]);
+  // Data for line chart (registrations over time)
+  const timelineData = useMemo(() => {
+    const months: { [key: string]: number } = {};
+    applications.forEach((app) => {
+      const date = new Date(app.submittedAt);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      months[monthKey] = (months[monthKey] || 0) + 1;
+    });
+    return Object.entries(months)
+      .map(([month, count]) => ({ month, count }))
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .slice(-12); // last 12 months
+  }, [applications]);
 
-	// Unique African countries from applications
-	const availableCountries = useMemo(() => {
-		const countries = [
-			...new Set(applications.map((app) => app.country).filter(Boolean)),
-		];
-		return countries
-			.filter((c) =>
-				AFRICAN_COUNTRIES.some((a) => a.toLowerCase() === c.toLowerCase()),
-			)
-			.sort();
-	}, [applications]);
+  // Filtered applications for recent list
+  const filteredApplications = useMemo(() => {
+    if (selectedCountry === "all") return applications;
+    return applications.filter((app) => app.country === selectedCountry);
+  }, [applications, selectedCountry]);
 
-	// High-risk apps
-	const highRiskApps = useMemo(
-		() =>
-			filteredApplications.filter(
-				(app) =>
-					app.riskAssessment?.level === "high" ||
-					app.riskAssessment?.level === "critical",
-			),
-		[filteredApplications],
-	);
+  // Recent applications (last 5)
+  const recentApplications = useMemo(() => {
+    return [...filteredApplications]
+      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
+      .slice(0, 5);
+  }, [filteredApplications]);
 
-	// Recent applications (last 5)
-	const recentApplications = useMemo(
-		() =>
-			[...filteredApplications]
-				.sort(
-					(a, b) =>
-						new Date(b.submittedAt).getTime() -
-						new Date(a.submittedAt).getTime(),
-				)
-				.slice(0, 5),
-		[filteredApplications],
-	);
+  // Unique African countries in data
+  const availableCountries = useMemo(() => {
+    const countries = new Set(applications.map((app) => app.country).filter(Boolean));
+    return Array.from(countries)
+      .filter((c) => AFRICAN_COUNTRIES.some((ac) => ac.toLowerCase() === c.toLowerCase()))
+      .sort();
+  }, [applications]);
 
-	if (isLoading) {
-		return (
-			<DashboardLayout>
-				<div className="flex items-center justify-center h-64">
-					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-				</div>
-			</DashboardLayout>
-		);
-	}
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
-	// Show debug info in development
-	const showDebug = process.env.NODE_ENV === "development";
+  return (
+    <DashboardLayout>
+      <div className="space-y-8">
+        {/* Header + Country Filter */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Registration Dashboard</h1>
+            <p className="text-muted-foreground mt-1">
+              Youth‑Led Organizations Across Africa
+              {selectedCountry !== "all" && selectedCountry && (
+                <span className="ml-2 font-medium text-primary">• {selectedCountry}</span>
+              )}
+            </p>
+          </div>
 
-	return (
-		<DashboardLayout>
-			<div className="space-y-8">
-				{/* Header + Country Filter */}
-				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-					<div>
-						<h1 className="text-3xl font-bold">Dashboard</h1>
-						<p className="text-muted-foreground mt-1">
-							Youth Organization Verification Overview
-							{selectedCountry !== "all" && selectedCountry && (
-								<span className="ml-2 font-medium text-primary">
-									• {selectedCountry}
-								</span>
-							)}
-						</p>
-					</div>
+          <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+            <SelectTrigger className="w-[220px]">
+              <div className="flex items-center gap-2">
+                <Globe className="h-4 w-4" />
+                <SelectValue placeholder="Filter by country" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Countries ({stats.total})</SelectItem>
+              {availableCountries.map((country) => (
+                <SelectItem key={country} value={country}>
+                  {country}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-					<Select value={selectedCountry} onValueChange={setSelectedCountry}>
-						<SelectTrigger className="w-[220px]">
-							<div className="flex items-center gap-2">
-								<Globe className="h-4 w-4" />
-								<SelectValue placeholder="Filter by country" />
-							</div>
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">
-								All African Countries ({localStats.total})
-							</SelectItem>
-							{availableCountries.map((country) => (
-								<SelectItem key={country} value={country}>
-									{country}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</div>
+        {/* Stats Cards */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Registrations</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.total}</div>
+              <p className="text-xs text-muted-foreground">All submitted applications</p>
+            </CardContent>
+          </Card>
 
-				{/* Main Stats Grid - Using localStats */}
-				<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-					<Card className="border-l-4 border-l-blue-500">
-						<CardHeader className="pb-2">
-							<CardTitle className="text-sm font-medium">
-								Total Applications
-							</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<div className="text-2xl font-bold">{localStats.total}</div>
-							<p className="text-xs text-muted-foreground">
-								All submitted applications
-							</p>
-						</CardContent>
-					</Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Approved</CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
+              <p className="text-xs text-muted-foreground">Verified organizations</p>
+            </CardContent>
+          </Card>
 
-					<Card className="border-l-4 border-l-amber-500">
-						<CardHeader className="pb-2">
-							<CardTitle className="text-sm font-medium">
-								Pending Review
-							</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<div className="text-2xl font-bold">{localStats.pending}</div>
-							<p className="text-xs text-muted-foreground">Awaiting review</p>
-							{localStats.total > 0 && (
-								<Badge variant="outline" className="mt-1">
-									{Math.round((localStats.pending / localStats.total) * 100)}%
-									of total
-								</Badge>
-							)}
-						</CardContent>
-					</Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pending Review</CardTitle>
+              <AlertCircle className="h-4 w-4 text-yellow-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
+              <p className="text-xs text-muted-foreground">Awaiting decision</p>
+            </CardContent>
+          </Card>
 
-					<Card className="border-l-4 border-l-green-500">
-						<CardHeader className="pb-2">
-							<CardTitle className="text-sm font-medium">Approved</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<div className="text-2xl font-bold">{localStats.approved}</div>
-							<p className="text-xs text-muted-foreground">
-								Verified organizations
-							</p>
-						</CardContent>
-					</Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Rejected / Flagged</CardTitle>
+              <XCircle className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">
+                {stats.rejected + stats.flagged}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {stats.rejected} rejected • {stats.flagged} flagged
+              </p>
+            </CardContent>
+          </Card>
+        </div>
 
-					<Card className="border-l-4 border-l-red-500">
-						<CardHeader className="pb-2">
-							<CardTitle className="text-sm font-medium">
-								Flagged / Rejected
-							</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<div className="text-2xl font-bold">
-								{localStats.flagged + localStats.rejected}
-							</div>
-							<p className="text-xs text-muted-foreground">
-								{localStats.flagged} flagged • {localStats.rejected} rejected
-							</p>
-							{showDebug && (
-								<div className="mt-1 text-xs text-gray-500">
-									Debug: F={localStats.flagged} R={localStats.rejected}
-								</div>
-							)}
-						</CardContent>
-					</Card>
-				</div>
+        {/* Charts Row */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Bar Chart: Registrations by Country */}
+          <Card className="col-span-1">
+            <CardHeader>
+              <CardTitle className="text-lg">Registrations by Country</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {countryData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={countryData} layout="vertical" margin={{ left: 40 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis dataKey="country" type="category" width={100} />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="count" fill={COLORS.country} name="Organizations" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                  No data to display
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-				{/* High Risk Alert */}
-				{highRiskApps.length > 0 && (
-					<Card className="border-red-500/50 bg-red-50">
-						<CardHeader>
-							<CardTitle className="flex items-center gap-2 text-red-700">
-								<AlertTriangle className="w-5 h-5" />
-								High Risk Applications Detected ({highRiskApps.length})
-							</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<div className="space-y-3">
-								{highRiskApps.slice(0, 3).map((app) => (
-									<div
-										key={app.id}
-										className="flex items-center justify-between p-3 bg-white rounded-lg border border-red-200"
-									>
-										<div>
-											<p className="font-medium text-red-800">
-												{app.organizationName}
-											</p>
-											<p className="text-sm text-red-600">
-												{app.country} • Score: {app.riskAssessment?.score}/100 •
-												Status: {app.status}
-											</p>
-										</div>
-										<div className="flex items-center gap-2">
-											<Badge variant="destructive">
-												{app.riskAssessment?.level.toUpperCase()} RISK
-											</Badge>
-											<Button size="sm" variant="destructive" asChild>
-												<Link to={`/applications/${app.id}`}>
-													Review <ArrowRight className="w-4 h-4 ml-1" />
-												</Link>
-											</Button>
-										</div>
-									</div>
-								))}
-								{highRiskApps.length > 3 && (
-									<div className="text-center pt-2">
-										<Button variant="link" className="text-red-600" asChild>
-											<Link to="/applications?risk=high">
-												View all {highRiskApps.length} high risk applications
-												<ArrowRight className="ml-1 w-4 h-4" />
-											</Link>
-										</Button>
-									</div>
-								)}
-							</div>
-						</CardContent>
-					</Card>
-				)}
+          {/* Pie Chart: Status Distribution */}
+          <Card className="col-span-1">
+            <CardHeader>
+              <CardTitle className="text-lg">Registration Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {statusData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={statusData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {statusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                  No data to display
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-				{/* Recent Applications */}
-				{recentApplications.length > 0 && (
-					<Card>
-						<CardHeader>
-							<CardTitle className="flex items-center gap-2">
-								<Clock className="w-5 h-5" />
-								Recent Applications
-							</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<div className="space-y-3">
-								{recentApplications.map((app) => (
-									<div
-										key={app.id}
-										className="flex items-center justify-between p-3 hover:bg-muted rounded-lg transition-colors"
-									>
-										<div className="space-y-1">
-											<p className="font-medium truncate max-w-[240px]">
-												{app.organizationName}
-											</p>
-											<div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-												<span>{app.country}</span>
-												<span>•</span>
-												<Badge variant="outline" className="text-xs">
-													{app.riskAssessment?.level} risk
-												</Badge>
-												<span>•</span>
-												<Badge
-													variant={
-														app.status === "approved"
-															? "default"
-															: app.status === "flagged"
-																? "destructive"
-																: app.status === "rejected"
-																	? "destructive"
-																	: "outline"
-													}
-													className="text-xs"
-												>
-													{app.status}
-												</Badge>
-												<span>•</span>
-												<span>
-													{new Date(app.submittedAt).toLocaleDateString()}
-												</span>
-											</div>
-										</div>
-										<Button size="sm" variant="ghost" asChild>
-											<Link to={`/applications/${app.id}`}>
-												<Eye className="h-4 w-4" />
-											</Link>
-										</Button>
-									</div>
-								))}
-							</div>
-							<Button className="w-full mt-4" variant="outline" asChild>
-								<Link to="/applications">
-									View All Applications <ArrowRight className="ml-2 w-4 h-4" />
-								</Link>
-							</Button>
-						</CardContent>
-					</Card>
-				)}
-			</div>
-		</DashboardLayout>
-	);
+          {/* Line Chart: Registrations Over Time (full width) */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-lg">Registrations Over Time</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {timelineData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={timelineData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="count" stroke="#3b82f6" activeDot={{ r: 8 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                  No data to display
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Applications */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5" />
+              Recent Registrations
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {recentApplications.length > 0 ? (
+                recentApplications.map((app) => (
+                  <div
+                    key={app.id}
+                    className="flex items-center justify-between p-3 hover:bg-muted rounded-lg transition-colors"
+                  >
+                    <div className="space-y-1">
+                      <p className="font-medium truncate max-w-[240px]">
+                        {app.organizationName}
+                      </p>
+                      <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                        <span>{app.country}</span>
+                        <span>•</span>
+                        <Badge
+                          variant={
+                            app.status === "approved"
+                              ? "default"
+                              : app.status === "rejected" || app.status === "flagged"
+                              ? "destructive"
+                              : "outline"
+                          }
+                          className="text-xs"
+                        >
+                          {app.status}
+                        </Badge>
+                        <span>•</span>
+                        <span>{new Date(app.submittedAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="ghost" asChild>
+                      <Link to={`/applications/${app.id}`}>
+                        <Eye className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No recent applications
+                </div>
+              )}
+            </div>
+            <Button className="w-full mt-4" variant="outline" asChild>
+              <Link to="/applications">
+                View All Applications <Clock className="ml-2 w-4 h-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </DashboardLayout>
+  );
 };
 
 export default Dashboard;

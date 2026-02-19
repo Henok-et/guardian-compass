@@ -49,7 +49,6 @@ export interface RiskBreakdown {
 	noRecentActivity: number;
 	nonYouthLeadership: number;
 	incompleteFields: number;
-	countryRisk: number;
 	invalidData: number;
 	total: number;
 	[key: string]: number;
@@ -62,7 +61,6 @@ export interface BreakdownReason {
 		| "noRecentActivity"
 		| "nonYouthLeadership"
 		| "incompleteFields"
-		| "countryRisk"
 		| "invalidData";
 	reason: string;
 	value?: number;
@@ -118,22 +116,6 @@ const YOUTH_MAX_AGE = 35;
 const MIN_VALID_AGE = 15;
 const MAX_VALID_AGE = 100;
 
-const HIGH_RISK_COUNTRIES = new Set(
-	[
-		"somalia",
-		"sudan",
-		"mali",
-		"central african republic",
-		"democratic republic of congo",
-		"burkina faso",
-		"nigeria",
-		"libya",
-		"chad",
-		"cameroon",
-		"niger",
-		"south sudan",
-	].map((c) => c.toLowerCase()),
-);
 
 const SANCTIONS_XML_PATH = getEnvVar("UN_SANCTIONS_PATH") || "consolidated.xml";
 const SANCTIONS_XML_URL = getEnvVar("UN_SANCTIONS_URL") || ""; // optional online source
@@ -443,7 +425,7 @@ export async function calculateRiskScore(
 		noRecentActivity: 0,
 		nonYouthLeadership: 0,
 		incompleteFields: 0,
-		countryRisk: 0,
+		
 		invalidData: 0,
 		total: 0,
 	};
@@ -576,17 +558,7 @@ export async function calculateRiskScore(
 		});
 	}
 
-	// COUNTRY RISK
-	if (HIGH_RISK_COUNTRIES.has(application.country.toLowerCase().trim())) {
-		breakdown.countryRisk = 35;
-		reasons.push({
-			category: "countryRisk",
-			reason: `Applicant country ${application.country} is high risk`,
-		});
-	}
 
-	// TOTAL & LEVEL
-	// TOTAL & LEVEL
 	// TOTAL & LEVEL
 	breakdown.total = Object.values(breakdown).reduce(
 		(sum, v) => sum + (typeof v === "number" ? v : 0),
@@ -600,10 +572,10 @@ export async function calculateRiskScore(
 		score >= 85 ||
 		sanctionMatches.length > 0 ||
 		invalidAgeCount > 2 ||
-		(breakdown.countryRisk > 0 && breakdown.sanctionsMatch > 0)
+		(breakdown.sanctionsMatch > 0)
 	) {
 		level = "critical";
-	} else if (score >= 70 || invalidAgeCount > 0 || breakdown.countryRisk > 0) {
+	} else if (score >= 70 || invalidAgeCount > 0 ) {
 		level = "high";
 	} else if (score >= 30) {
 		level = "medium";
