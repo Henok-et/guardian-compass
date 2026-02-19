@@ -24,21 +24,65 @@ import {
 
 // African countries list
 const AFRICAN_COUNTRIES = [
-	"Algeria", "Angola", "Benin", "Botswana", "Burkina Faso", "Burundi",
-	"Cabo Verde", "Cameroon", "Central African Republic", "Chad", "Comoros",
-	"Congo", "Côte d'Ivoire", "Djibouti", "Egypt", "Equatorial Guinea",
-	"Eritrea", "Eswatini", "Ethiopia", "Gabon", "Gambia", "Ghana", "Guinea",
-	"Guinea-Bissau", "Kenya", "Lesotho", "Liberia", "Libya", "Madagascar",
-	"Malawi", "Mali", "Mauritania", "Mauritius", "Morocco", "Mozambique",
-	"Namibia", "Niger", "Nigeria", "Rwanda", "São Tomé and Príncipe", "Senegal",
-	"Seychelles", "Sierra Leone", "Somalia", "South Africa", "South Sudan",
-	"Sudan", "Tanzania", "Togo", "Tunisia", "Uganda", "Zambia", "Zimbabwe",
+	"Algeria",
+	"Angola",
+	"Benin",
+	"Botswana",
+	"Burkina Faso",
+	"Burundi",
+	"Cabo Verde",
+	"Cameroon",
+	"Central African Republic",
+	"Chad",
+	"Comoros",
+	"Congo",
+	"Côte d'Ivoire",
+	"Djibouti",
+	"Egypt",
+	"Equatorial Guinea",
+	"Eritrea",
+	"Eswatini",
+	"Ethiopia",
+	"Gabon",
+	"Gambia",
+	"Ghana",
+	"Guinea",
+	"Guinea-Bissau",
+	"Kenya",
+	"Lesotho",
+	"Liberia",
+	"Libya",
+	"Madagascar",
+	"Malawi",
+	"Mali",
+	"Mauritania",
+	"Mauritius",
+	"Morocco",
+	"Mozambique",
+	"Namibia",
+	"Niger",
+	"Nigeria",
+	"Rwanda",
+	"São Tomé and Príncipe",
+	"Senegal",
+	"Seychelles",
+	"Sierra Leone",
+	"Somalia",
+	"South Africa",
+	"South Sudan",
+	"Sudan",
+	"Tanzania",
+	"Togo",
+	"Tunisia",
+	"Uganda",
+	"Zambia",
+	"Zimbabwe",
 ];
 
 const Dashboard = () => {
 	const { applications, isLoading } = useApplications();
 	const [selectedCountry, setSelectedCountry] = useState<string>("all");
-	
+
 	// Local stats calculation - MORE RELIABLE
 	const [localStats, setLocalStats] = useState({
 		total: 0,
@@ -54,25 +98,31 @@ const Dashboard = () => {
 		if (applications.length > 0) {
 			// Debug: Log what we're working with
 			console.log("Dashboard applications:", applications);
-			console.log("Application statuses:", applications.map(app => ({
-				id: app.id,
-				name: app.organizationName,
-				status: app.status,
-				riskLevel: app.riskAssessment?.level
-			})));
-			
+			console.log(
+				"Application statuses:",
+				applications.map((app) => ({
+					id: app.id,
+					name: app.organizationName,
+					status: app.status,
+					riskLevel: app.riskAssessment?.level,
+				})),
+			);
+
 			const stats = {
 				total: applications.length,
-				pending: applications.filter(app => app.status === "pending").length,
-				approved: applications.filter(app => app.status === "approved").length,
-				flagged: applications.filter(app => app.status === "flagged").length,
-				rejected: applications.filter(app => app.status === "rejected").length,
-				highRisk: applications.filter(app => 
-					app.riskAssessment?.level === "high" || 
-					app.riskAssessment?.level === "critical"
+				pending: applications.filter((app) => app.status === "pending").length,
+				approved: applications.filter((app) => app.status === "approved")
+					.length,
+				flagged: applications.filter((app) => app.status === "flagged").length,
+				rejected: applications.filter((app) => app.status === "rejected")
+					.length,
+				highRisk: applications.filter(
+					(app) =>
+						app.riskAssessment?.level === "high" ||
+						app.riskAssessment?.level === "critical",
 				).length,
 			};
-			
+
 			console.log("Calculated local stats:", stats);
 			setLocalStats(stats);
 		} else {
@@ -92,7 +142,7 @@ const Dashboard = () => {
 		if (selectedCountry === "all" || !selectedCountry) {
 			return applications;
 		}
-		return applications.filter(app => app.country === selectedCountry);
+		return applications.filter((app) => app.country === selectedCountry);
 	}, [applications, selectedCountry]);
 
 	// Unique African countries from applications
@@ -142,37 +192,11 @@ const Dashboard = () => {
 	}
 
 	// Show debug info in development
-	const showDebug = process.env.NODE_ENV === 'development';
+	const showDebug = process.env.NODE_ENV === "development";
 
 	return (
 		<DashboardLayout>
 			<div className="space-y-8">
-				{/* Debug Info - Only in development */}
-				{showDebug && (
-					<Card className="bg-yellow-50 border-yellow-200">
-						<CardContent className="pt-6">
-							<details>
-								<summary className="cursor-pointer font-medium text-yellow-800">
-									Debug Info: {applications.length} applications loaded
-								</summary>
-								<pre className="text-xs mt-2 overflow-auto max-h-40">
-									{JSON.stringify(
-										applications.map(app => ({
-											id: app.id.substring(0, 8),
-											name: app.organizationName.substring(0, 30),
-											status: app.status,
-											country: app.country,
-											risk: app.riskAssessment?.level,
-										})), 
-										null, 
-										2
-									)}
-								</pre>
-							</details>
-						</CardContent>
-					</Card>
-				)}
-
 				{/* Header + Country Filter */}
 				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 					<div>
@@ -234,7 +258,8 @@ const Dashboard = () => {
 							<p className="text-xs text-muted-foreground">Awaiting review</p>
 							{localStats.total > 0 && (
 								<Badge variant="outline" className="mt-1">
-									{Math.round((localStats.pending / localStats.total) * 100)}% of total
+									{Math.round((localStats.pending / localStats.total) * 100)}%
+									of total
 								</Badge>
 							)}
 						</CardContent>
@@ -353,12 +378,18 @@ const Dashboard = () => {
 													{app.riskAssessment?.level} risk
 												</Badge>
 												<span>•</span>
-												<Badge variant={
-													app.status === "approved" ? "default" :
-													app.status === "flagged" ? "destructive" :
-													app.status === "rejected" ? "destructive" :
-													"outline"
-												} className="text-xs">
+												<Badge
+													variant={
+														app.status === "approved"
+															? "default"
+															: app.status === "flagged"
+																? "destructive"
+																: app.status === "rejected"
+																	? "destructive"
+																	: "outline"
+													}
+													className="text-xs"
+												>
 													{app.status}
 												</Badge>
 												<span>•</span>
