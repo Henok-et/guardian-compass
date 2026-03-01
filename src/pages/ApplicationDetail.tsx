@@ -86,9 +86,6 @@ const ApplicationDetail = () => {
 	const [flagNotes, setFlagNotes] = useState("");
 	const [rejectReason, setRejectReason] = useState("");
 
-	// Notification toggle
-	const [notifyApplicant, setNotifyApplicant] = useState(false);
-
 	// Duplicate alert
 	const [showDuplicateAlert, setShowDuplicateAlert] = useState(false);
 	const [duplicateInfo, setDuplicateInfo] = useState<{
@@ -334,7 +331,7 @@ const ApplicationDetail = () => {
 			// refetch();
 
 			// Optionally notify applicant
-			if (notifyApplicant && application.email) {
+			if (application.email) {
 				try {
 					const tokenRaw = localStorage.getItem("au_verification_auth");
 					const token = tokenRaw ? JSON.parse(tokenRaw).token || null : null;
@@ -392,7 +389,7 @@ const ApplicationDetail = () => {
 			// state already updated locally; don't refetch immediately (avoids stale storage)
 			// refetch();
 
-			if (notifyApplicant && application.email) {
+			if (application.email) {
 				try {
 					const tokenRaw = localStorage.getItem("au_verification_auth");
 					const token = tokenRaw ? JSON.parse(tokenRaw).token || null : null;
@@ -452,7 +449,7 @@ const ApplicationDetail = () => {
 			// state already updated locally; avoid refetch for the same reason as flag
 			// refetch();
 
-			if (notifyApplicant && application.email) {
+			if (application.email) {
 				try {
 					const tokenRaw = localStorage.getItem("au_verification_auth");
 					const token = tokenRaw ? JSON.parse(tokenRaw).token || null : null;
