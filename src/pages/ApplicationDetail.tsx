@@ -13,7 +13,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { getRiskBadgeColor, parseDOBToDate } from "@/lib/riskScoring";
+import {
+	getRiskBadgeColor,
+	parseDOBToDate,
+	RiskAssessment,
+} from "@/lib/riskScoring";
 import {
 	ArrowLeft,
 	Building2,
@@ -48,6 +52,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+import { Application as BaseApplication } from "@/types/application";
+
+type RiskReason = { reason: string; value?: string | number };
+
+type Application = BaseApplication & {
+	riskAssessment: RiskAssessment & {
+		reasons?: RiskReason[];
+	};
+};
 const ApplicationDetail = () => {
 	const { id } = useParams<{ id: string }>();
 	const navigate = useNavigate();
@@ -132,7 +146,11 @@ const ApplicationDetail = () => {
 		};
 	}, [isPageLoading]);
 
-	const application = getApplicationById(id || "");
+	// Extend the risk assessment type to include 'reasons'
+
+	// Extend application type to include optional reasons in riskAssessment
+
+	const application = getApplicationById(id || "") as Application;
 
 	// Check for duplicates on load
 	useEffect(() => {
@@ -237,6 +255,65 @@ const ApplicationDetail = () => {
 		return `Age: ${ageNumber !== null ? ageNumber : leader.dob || "Unknown"} (${label})`;
 	};
 
+	// Format risk summary for email notifications
+	const formatRiskSummary = (ra: typeof riskAssessment) => {
+		if (!ra) return "No risk assessment available.";
+		const lines: string[] = [];
+		lines.push(`Score: ${ra.score}/100`);
+		lines.push(`Level: ${ra.level.toUpperCase()}`);
+		lines.push("Breakdown:");
+		Object.entries(ra.breakdown)
+			.filter(([k]) => k !== "total")
+			.forEach(([k, v]) => {
+				lines.push(` - ${k}: ${v}`);
+			});
+		if (ra.reasons && ra.reasons.length > 0) {
+			lines.push("Reasons:");
+			ra.reasons.forEach((r) => {
+				lines.push(
+					` - ${r.reason}${r.value !== undefined ? ` (${r.value})` : ""}`,
+				);
+			});
+		}
+		return lines.join("\n");
+	};
+
+	// HTML version of the risk summary for richer email formatting
+	const formatRiskSummaryHtml = (ra: typeof riskAssessment) => {
+		if (!ra) return "<p>No risk assessment available.</p>";
+		const parts: string[] = [];
+		parts.push(`<h3 style="margin:0 0 .5rem 0;">Risk Summary</h3>`);
+		parts.push(
+			`<p style="margin:0 0 .25rem 0;"><strong>Score:</strong> ${ra.score}/100</p>`,
+		);
+		parts.push(
+			`<p style="margin:0 0 .5rem 0;"><strong>Level:</strong> ${ra.level.toUpperCase()}</p>`,
+		);
+		parts.push(
+			`<table style="width:100%;border-collapse:collapse;margin-bottom:.5rem;"><thead><tr><th style="text-align:left;padding:.25rem 0;">Category</th><th style="text-align:right;padding:.25rem 0;">Points</th></tr></thead><tbody>`,
+		);
+		Object.entries(ra.breakdown)
+			.filter(([k]) => k !== "total")
+			.forEach(([k, v]) => {
+				parts.push(
+					`<tr><td style="padding:.125rem 0;">${k}</td><td style="padding:.125rem 0;text-align:right;">${v}</td></tr>`,
+				);
+			});
+		parts.push(`</tbody></table>`);
+		if (ra.reasons && ra.reasons.length > 0) {
+			parts.push(
+				`<p style="margin:0 0 .25rem 0;"><strong>Reasons:</strong></p><ul>`,
+			);
+			ra.reasons.forEach((r) => {
+				parts.push(
+					`<li>${r.reason}${r.value !== undefined ? ` (${r.value})` : ""}</li>`,
+				);
+			});
+			parts.push(`</ul>`);
+		}
+		return parts.join("");
+	};
+
 	// Enhanced action handlers with tracking
 	const handleApprove = async () => {
 		setIsActionLoading(true);
@@ -272,6 +349,10 @@ const ApplicationDetail = () => {
 							body: JSON.stringify({
 								to: application.email,
 								status: "approved",
+								riskSummary: formatRiskSummary(riskAssessment),
+								riskSummaryHtml: formatRiskSummaryHtml(riskAssessment),
+								breakdown: riskAssessment.breakdown,
+								reasons: riskAssessment.reasons,
 							}),
 						},
 					);
@@ -326,6 +407,10 @@ const ApplicationDetail = () => {
 							body: JSON.stringify({
 								to: application.email,
 								status: "flagged",
+								riskSummary: formatRiskSummary(riskAssessment),
+								riskSummaryHtml: formatRiskSummaryHtml(riskAssessment),
+								breakdown: riskAssessment.breakdown,
+								reasons: riskAssessment.reasons,
 							}),
 						},
 					);
@@ -382,6 +467,10 @@ const ApplicationDetail = () => {
 							body: JSON.stringify({
 								to: application.email,
 								status: "rejected",
+								riskSummary: formatRiskSummary(riskAssessment),
+								riskSummaryHtml: formatRiskSummaryHtml(riskAssessment),
+								breakdown: riskAssessment.breakdown,
+								reasons: riskAssessment.reasons,
 							}),
 						},
 					);
@@ -750,34 +839,102 @@ const ApplicationDetail = () => {
 
 										<div className="space-y-3">
 											<h4 className="font-medium">Score Breakdown</h4>
-											<div className="space-y-2 text-sm">
-												<div className="flex justify-between">
-													<span>Sanctions Match</span>
-													<span
-														className={
-															riskAssessment.breakdown.sanctionsMatch > 0
-																? "text-destructive font-medium"
-																: ""
-														}
+											{(() => {
+												const labels: Record<string, string> = {
+													sanctionsMatch: "Sanctions Match",
+													missingId: "Missing ID/Passport",
+													nonYouthLeadership: "Non‑youth Leadership",
+													noRecentActivity: "No Recent Activity",
+													incompleteFields: "Incomplete Fields",
+													invalidData: "Invalid Data",
+												};
+
+												// Ensure a friendly order: sanctions, missingId, nonYouthLeadership, then others
+												const preferredOrder = [
+													"sanctionsMatch",
+													"missingId",
+													"nonYouthLeadership",
+												];
+
+												const entries = Object.entries(riskAssessment.breakdown)
+													.filter(([k]) => k !== "total")
+													.sort((a, b) => {
+														const ia = preferredOrder.indexOf(a[0]);
+														const ib = preferredOrder.indexOf(b[0]);
+														if (ia === -1 && ib === -1) return 0;
+														if (ia === -1) return 1;
+														if (ib === -1) return -1;
+														return ia - ib;
+													});
+
+												if (entries.length === 0) {
+													return (
+														<p className="text-sm text-green-600">
+															All criteria met – low risk
+														</p>
+													);
+												}
+
+												// animate the reveal with framer-motion
+												return (
+													<motion.div
+														initial="hidden"
+														animate="visible"
+														variants={{
+															visible: {
+																transition: { staggerChildren: 0.06 },
+															},
+														}}
+														className="space-y-2 text-sm"
 													>
-														+{riskAssessment.breakdown.sanctionsMatch}
-													</span>
-												</div>
-												{/* ... other breakdown items ... */}
-												<div className="flex justify-between">
-													<span>Missing ID/Passport</span>
-													<span
-														className={
-															riskAssessment.breakdown.missingId > 0
-																? "text-yellow-600 font-medium"
-																: ""
-														}
+														{entries.map(([key, val]) => {
+															const positive =
+																typeof val === "number" && val > 0;
+															const colorClass = positive
+																? key === "missingId"
+																	? "text-yellow-600 font-medium"
+																	: "text-destructive font-medium"
+																: "";
+															return (
+																<motion.div
+																	key={key}
+																	variants={{
+																		hidden: { opacity: 0, y: 6 },
+																		visible: { opacity: 1, y: 0 },
+																	}}
+																	className="flex justify-between"
+																>
+																	<span>{labels[key] || key}</span>
+																	<span className={colorClass}>
+																		{positive ? `+${val}` : val}
+																	</span>
+																</motion.div>
+															);
+														})}
+													</motion.div>
+												);
+											})()}
+
+											{/* Reasons (explain why points were added) */}
+											{riskAssessment.reasons &&
+												riskAssessment.reasons.length > 0 && (
+													<motion.div
+														initial={{ opacity: 0, y: 6 }}
+														animate={{ opacity: 1, y: 0 }}
+														transition={{ delay: 0.08 }}
+														className="mt-2 text-sm space-y-1"
 													>
-														+{riskAssessment.breakdown.missingId}
-													</span>
-												</div>
-												{/* Add the rest of your breakdown items here */}
-											</div>
+														<h5 className="font-medium">Reasons</h5>
+														<ul className="list-disc list-inside">
+															{riskAssessment.reasons.map((r, i) => (
+																<li key={i}>
+																	{r.reason}
+																	{r.value !== undefined && ` (${r.value})`}
+																</li>
+															))}
+														</ul>
+													</motion.div>
+												)}
 										</div>
 									</CardContent>
 								</Card>

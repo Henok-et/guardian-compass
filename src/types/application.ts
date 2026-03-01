@@ -55,13 +55,13 @@ export interface TrackedApplication extends BaseApplication {
 			similarity: number;
 		}>;
 	};
-	// Tracking metadata
-	actionDate: string;
-	actionBy?: string; // admin user ID or name
-	notes?: string;
-	actionType: "approved" | "flagged" | "rejected" | "created" | "updated";
-}
 
+	// Tracking metadata – now OPTIONAL
+	actionDate?: string;
+	actionBy?: string;
+	notes?: string;
+	actionType?: "approved" | "flagged" | "rejected" | "created" | "updated";
+}
 // Union type — use this everywhere as "Application"
 export type Application = ApplicationWithRisk | TrackedApplication;
 

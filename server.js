@@ -224,7 +224,69 @@ app.post("/api/applications/:id/notify", async (req, res) => {
 			`,
 		};
 
+		// build a styled risk section from breakdown/reasons when provided
+		const buildRiskHtml = (breakdown = {}, reasons = []) => {
+			const labels = {
+				sanctionsMatch: "Sanctions Match",
+				missingId: "Missing ID/Passport",
+				noRecentActivity: "No Recent Activity",
+				nonYouthLeadership: "Non‑youth Leadership",
+				incompleteFields: "Incomplete Fields",
+				invalidData: "Invalid Data",
+			};
+			const rows = Object.entries(breakdown).filter(([k]) => k !== "total");
+			if (!rows.length && (!reasons || reasons.length === 0)) return "";
+			let html = `
+				<div style="background:#fff9f0;border-radius:6px;padding:14px;margin:18px 0;border:1px solid #fde3b7">
+					<p style="margin:0 0 8px;font-weight:600;color:#623b00">Risk Breakdown</p>
+					<table style="width:100%;border-collapse:collapse;font-size:14px;color:#222">
+					<tbody>
+				`;
+			for (const [k, v] of rows) {
+				const label = labels[k] || k;
+				const positive = typeof v === "number" && v > 0;
+				let valueHtml = `${v}`;
+				let valueStyle = "color:#111";
+				if (positive) {
+					if (k === "missingId") valueStyle = "color:#b45309;font-weight:700";
+					else valueStyle = "color:#b91c1c;font-weight:700";
+				}
+				html += `<tr><td style="padding:.125rem 0">${label}</td><td style="padding:.125rem 0;text-align:right;${valueStyle}">${valueHtml}</td></tr>`;
+			}
+			html += `</tbody></table>`;
+			if (reasons && reasons.length > 0) {
+				html += `<div style="margin-top:10px"><p style="margin:0 0 6px;font-weight:600;color:#623b00">Reasons</p><ul style="margin:0;padding-left:18px">`;
+				for (const r of reasons) {
+					html += `<li>${r.reason || r}</li>`;
+				}
+				html += `</ul></div>`;
+			}
+			html += `</div>`;
+			return html;
+		};
+
+		// prefer explicit HTML from client if provided, otherwise build from breakdown/reasons
+		const clientRiskHtml = req.body?.riskSummaryHtml;
+		const clientBreakdown = req.body?.breakdown;
+		const clientReasons = req.body?.reasons;
+		const riskSection =
+			clientRiskHtml || buildRiskHtml(clientBreakdown, clientReasons);
+
 		// Enhanced email message with proper sender name and reply-to
+		// Inject the riskSection into the HTML template (before the signature block)
+		const baseHtml = htmlMap[statusLower] || `<p>${textMap[statusLower]}</p>`;
+		let finalHtml = baseHtml;
+		if (riskSection) {
+			const insertMarker =
+				'<div style="margin-top:30px;padding-top:20px;border-top:1px solid #dee2e6">';
+			const idx = baseHtml.indexOf(insertMarker);
+			if (idx !== -1) {
+				finalHtml = baseHtml.slice(0, idx) + riskSection + baseHtml.slice(idx);
+			} else {
+				finalHtml = riskSection + baseHtml;
+			}
+		}
+
 		const msg = {
 			to,
 			from: {
@@ -234,7 +296,7 @@ app.post("/api/applications/:id/notify", async (req, res) => {
 			replyTo: "youth@au.int",
 			subject: subjectMap[statusLower] || `Update on Application ${id}`,
 			text: textMap[statusLower] || `Status update for application ${id}`,
-			html: htmlMap[statusLower] || `<p>${textMap[statusLower]}</p>`,
+			html: finalHtml,
 		};
 
 		await sgMail.send(msg);
