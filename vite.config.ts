@@ -1,21 +1,36 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
+import { componentTagger } from "lovable-tagger"; // comment if error
 
-// https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  server: {
-    host: "::",
-    port: 8080,
-    hmr: {
-      overlay: false,
-    },
-  },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
+	server: {
+		host: "localhost",
+		port: 5173,
+		strictPort: true,
+		hmr: {
+			overlay: true,
+		},
+		proxy: {
+			// Proxy all requests starting with /api to backend on port 5000
+			"/api": {
+				target: "http://localhost:5000",
+				changeOrigin: true,
+				secure: false,
+				// rewrite: (path) => path.replace(/^\/api/, '/api') // keep /api if backend expects it
+			},
+		},
+	},
+
+	plugins: [react(), mode === "development" && componentTagger()].filter(
+		Boolean,
+	),
+
+	resolve: {
+		alias: {
+			"@": path.resolve(__dirname, "./src"),
+		},
+	},
+
+	base: mode === "production" ? "/" : "/",
 }));

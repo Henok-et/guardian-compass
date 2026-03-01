@@ -1,46 +1,6 @@
 import Fuse from "fuse.js";
 
-// Detect Node vs Browser runtime (safe check)
-const isNode = (() => {
-	try {
-		if (typeof process === "undefined") return false;
-		const p = process as unknown as { versions?: { node?: string } };
-		return typeof p.versions?.node === "string";
-	} catch {
-		return false;
-	}
-})();
-
-function getEnvVar(key: string): string | undefined {
-	// Node: check process.env safely
-	try {
-		if (
-			typeof process !== "undefined" &&
-			typeof (process as unknown) === "object"
-		) {
-			const p = process as unknown as { env?: Record<string, string> };
-			if (p.env && p.env[key]) return p.env[key];
-		}
-	} catch (err) {
-		// Avoid logging sensitive values; log only that reading process.env failed for the key
-		console.debug?.(
-			`[getEnvVar] Failed to read process.env for key=${key}: ${(err as Error).message}`,
-		);
-	}
-
-	// Vite/browser: check import.meta.env
-	try {
-		const me = import.meta as unknown as { env?: Record<string, string> };
-		if (me.env && me.env[key]) return me.env[key];
-	} catch (err) {
-		// Avoid logging sensitive values; log only that reading import.meta.env failed for the key
-		console.debug?.(
-			`[getEnvVar] Failed to read import.meta.env for key=${key}: ${(err as Error).message}`,
-		);
-	}
-
-	return undefined;
-}
+const isNode = typeof window === "undefined" && typeof process !== "undefined";
 
 /* ===================== TYPES ===================== */
 export interface RiskBreakdown {
@@ -71,12 +31,12 @@ export interface RiskAssessment {
 	level: "low" | "medium" | "high" | "critical";
 	breakdown: RiskBreakdown;
 	reasons: BreakdownReason[];
-	// Normalize to UI-friendly shape
 	sanctionMatches: {
 		inputName: string;
 		sanctionedName: string;
 		similarity: number;
 	}[];
+	autoApproveSuggested?: boolean;
 }
 
 export interface LeadershipInfo {
@@ -84,7 +44,7 @@ export interface LeadershipInfo {
 	role?: string;
 	age?: number;
 	dob?: string;
-	hasId?: boolean; // may be undefined from form; will treat as false if not set
+	hasId?: boolean;
 	isFinalDecisionMaker?: boolean;
 }
 
@@ -106,40 +66,30 @@ export interface ApplicationData {
 	status: "pending" | "approved" | "rejected" | "flagged";
 }
 
-export interface ApplicationWithRisk extends ApplicationData {
-	riskAssessment: RiskAssessment;
-}
-
-/* ===================== CONSTANTS & CONFIG ===================== */
+/* ===================== CONFIG & STATE ===================== */
 const YOUTH_MIN_AGE = 15;
 const YOUTH_MAX_AGE = 35;
 const MIN_VALID_AGE = 15;
 const MAX_VALID_AGE = 100;
 
-
-const SANCTIONS_XML_PATH = getEnvVar("UN_SANCTIONS_PATH") || "consolidated.xml";
-const SANCTIONS_XML_URL = getEnvVar("UN_SANCTIONS_URL") || ""; // optional online source
 const SANCTIONS_CACHE_JSON =
-	getEnvVar("UN_SANCTIONS_CACHE") || ".sanctions.cache.json";
+	(isNode && process.env.UN_SANCTIONS_CACHE) || "sanctions.json";
 const SANCTIONS_REFRESH_DAYS = Number(
-	getEnvVar("UN_SANCTIONS_REFRESH_DAYS") ?? "7",
+	(isNode && process.env.UN_SANCTIONS_REFRESH_DAYS) ?? "7",
 );
 const FUZZY_THRESHOLD = Number(
-	getEnvVar("SANCTIONS_FUZZY_THRESHOLD") ?? "0.35",
+	(isNode && process.env.SANCTIONS_FUZZY_THRESHOLD) ?? "0.45",
 );
 
-/* ===================== CACHE ===================== */
 let sanctionedNames: string[] = [];
 let fuse: Fuse<string> | null = null;
-let lastLoadedAt: number | null = null; // epoch ms
+let lastLoadedAt: number | null = null;
 
 /* ===================== HELPERS ===================== */
-
-// Normalize names for fuzzy matching (remove diacritics, punctuation, titles, extra spaces)
 function normalizeNameForMatch(input: string): string {
 	return input
 		.normalize("NFKD")
-		.replace(/\p{Diacritic}/gu, "") // remove accents
+		.replace(/\p{Diacritic}/gu, "")
 		.replace(/\b(mr|ms|mrs|dr|prof|hon|sr|jr|ii|iii|iv)\b/gi, "")
 		.replace(/[^a-zA-Z0-9\s]/g, "")
 		.replace(/\s+/g, " ")
@@ -147,17 +97,14 @@ function normalizeNameForMatch(input: string): string {
 		.toLowerCase();
 }
 
-// Try various date formats (DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD, and fallback to Date constructor)
 function parseDOBToDate(dob?: string): Date | null {
 	if (!dob) return null;
 	const s = dob.trim();
-	// ISO-like
 	const iso = /^\d{4}-\d{2}-\d{2}$/;
 	if (iso.test(s)) {
 		const d = new Date(s);
 		if (!isNaN(d.getTime())) return d;
 	}
-	// DD/MM/YYYY or D/M/YYYY
 	const dm = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 	const m1 = s.match(dm);
 	if (m1) {
@@ -167,20 +114,6 @@ function parseDOBToDate(dob?: string): Date | null {
 		const d = new Date(year, month - 1, day);
 		if (!isNaN(d.getTime())) return d;
 	}
-	// MM/DD/YYYY ambiguous - only accept if month <=12 and day<=31 and year reasonable
-	const mm = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-	const m2 = s.match(mm);
-	if (m2) {
-		const part1 = Number(m2[1]);
-		const part2 = Number(m2[2]);
-		const year = Number(m2[3]);
-		// heuristic: if part1 > 12 then it's DD/MM/YYYY handled above. If part1 <= 12 and part2 > 12 maybe MM/DD
-		if (part1 >= 1 && part1 <= 12 && part2 >= 1 && part2 <= 31) {
-			const d = new Date(year, part1 - 1, part2);
-			if (!isNaN(d.getTime())) return d;
-		}
-	}
-	// Fallback to Date constructor
 	const df = new Date(s);
 	return isNaN(df.getTime()) ? null : df;
 }
@@ -203,9 +136,39 @@ export function safeCalculateAge(dob?: string, providedAge?: number): number {
 	return age;
 }
 
-// Save parsed sanctions list to JSON cache for faster loads
+const FALLBACK_NAMES = [
+	"abdul bari",
+	"abdul basir",
+	"abdul ghafar",
+	"abdul ghani",
+	"yahya jammeh",
+	"germain katanga",
+];
+
+function buildFuse(names: string[]) {
+	fuse = new Fuse(names, {
+		includeScore: true,
+		threshold: FUZZY_THRESHOLD,
+		ignoreLocation: true,
+		minMatchCharLength: 3,
+	});
+}
+
+function tokensOf(norm: string) {
+	return Array.from(new Set(norm.split(/\s+/).filter(Boolean)));
+}
+
+function tokenOverlapScore(aTokens: string[], bTokens: string[]) {
+	if (aTokens.length === 0 || bTokens.length === 0) return 0;
+	const a = new Set(aTokens);
+	const b = new Set(bTokens);
+	let matches = 0;
+	for (const t of a) if (b.has(t)) matches++;
+	return matches / Math.max(a.size, b.size || 1);
+}
+
 async function saveSanctionsCache(list: string[]) {
-	if (!isNode) return; // don't attempt file writes in browsers
+	if (!isNode) return; // do not attempt filesystem writes in browser
 	try {
 		const fs = await import("fs/promises");
 		await fs.writeFile(
@@ -219,202 +182,120 @@ async function saveSanctionsCache(list: string[]) {
 }
 
 async function loadSanctionsCacheIfFresh(): Promise<string[] | null> {
-	if (!isNode) return null; // no filesystem in browser
+	if (!isNode) return null;
 	try {
 		const fs = await import("fs/promises");
-		const stat = await fs.stat(SANCTIONS_CACHE_JSON);
 		const raw = await fs.readFile(SANCTIONS_CACHE_JSON, "utf-8");
-		const parsed = JSON.parse(raw) as { names: string[]; loadedAt: number };
+		const parsed = JSON.parse(raw) as { names?: string[]; loadedAt?: number };
 		if (
 			parsed &&
+			parsed.names &&
 			parsed.loadedAt &&
 			Date.now() - parsed.loadedAt < SANCTIONS_REFRESH_DAYS * 24 * 3600 * 1000
 		) {
 			return parsed.names;
 		}
 	} catch {
-		// ignore - no cache or invalid
+		// missing
 	}
 	return null;
 }
 
-// Minimal fallback list (in case parsing fails)
-const FALLBACK_NAMES = [
-	"abdul bari",
-	"abdul basir",
-	"abdul ghafar",
-	"abdul ghani",
-];
-
-// Build Fuse index
-function buildFuse(names: string[]) {
-	fuse = new Fuse(names, {
-		includeScore: true,
-		threshold: FUZZY_THRESHOLD,
-		ignoreLocation: true,
-		minMatchCharLength: 3,
-	});
+export async function isSanctioned(inputName: string) {
+	const norm = normalizeNameForMatch(inputName);
+	if (!norm) return null;
+	if (!sanctionedNames || sanctionedNames.length === 0)
+		await refreshSanctions();
+	if (fuse) {
+		const results = fuse.search(norm, { limit: 5 });
+		if (results.length > 0) {
+			const best = results[0];
+			const rawScore = typeof best.score === "number" ? best.score : 1;
+			if (rawScore <= FUZZY_THRESHOLD) {
+				return {
+					sanctionedName: best.item,
+					similarity: 1 - rawScore,
+					method: "fuzzy",
+				};
+			}
+		}
+	}
+	const inputTokens = tokensOf(norm);
+	for (const s of sanctionedNames) {
+		const sTokens = tokensOf(s);
+		const overlap = tokenOverlapScore(inputTokens, sTokens);
+		if (overlap >= 0.6)
+			return {
+				sanctionedName: s,
+				similarity: overlap,
+				method: "token-overlap",
+			};
+		if (sTokens.length >= 2) {
+			const last = sTokens[sTokens.length - 1];
+			const first = sTokens[0];
+			if (
+				inputTokens.includes(last) &&
+				(inputTokens.includes(first) ||
+					inputTokens.some((t) => first.startsWith(t)))
+			) {
+				return { sanctionedName: s, similarity: overlap, method: "last-first" };
+			}
+		}
+	}
+	return null;
 }
 
-// Refresh sanctions list (publicly exported)
 export async function refreshSanctions(force = false): Promise<string[]> {
-	// If already loaded recently, skip unless forced
 	if (
 		!force &&
 		lastLoadedAt &&
 		Date.now() - lastLoadedAt < SANCTIONS_REFRESH_DAYS * 24 * 3600 * 1000
-	) {
+	)
 		return sanctionedNames;
-	}
-
-	// Try cache
 	const cache = await loadSanctionsCacheIfFresh();
 	if (cache && !force) {
-		sanctionedNames = cache;
+		sanctionedNames = cache.map(normalizeNameForMatch).filter(Boolean);
 		buildFuse(sanctionedNames);
 		lastLoadedAt = Date.now();
 		return sanctionedNames;
 	}
-
-	// If running in a browser environment, prefer a lightweight approach and avoid filesystem access
-	if (!isNode) {
-		if (SANCTIONS_XML_URL) {
-			try {
-				const resp = await fetch(SANCTIONS_XML_URL);
-				if (resp.ok) {
-					const text = await resp.text();
-					// naive alias extraction (best-effort in browser)
-					const matches = Array.from(
-						text.matchAll(/<ALIAS_NAME>([^<]+)<\/ALIAS_NAME>/gi),
-					).map((m) => m[1]);
-					if (matches.length > 0) {
-						sanctionedNames = Array.from(
-							new Set(matches.map(normalizeNameForMatch)),
-						).filter(Boolean);
-						buildFuse(sanctionedNames);
-						lastLoadedAt = Date.now();
-						return sanctionedNames;
-					}
-				}
-			} catch (e) {
-				console.warn("[Sanctions] Browser fetch failed:", (e as Error).message);
-			}
-		}
-
-		// fallback in browser
-		sanctionedNames = FALLBACK_NAMES;
-		buildFuse(sanctionedNames);
-		lastLoadedAt = Date.now();
-		return sanctionedNames;
-	}
-
-	// Node: attempt to read local XML or fetch remote XML
 	try {
-		let xmlContent: string | null = null;
-		try {
+		if (isNode) {
 			const fs = await import("fs/promises");
-			xmlContent = await fs.readFile(SANCTIONS_XML_PATH, "utf-8");
-		} catch (err) {
-			if (SANCTIONS_XML_URL) {
-				// try download
-				try {
-					const resp = await fetch(SANCTIONS_XML_URL);
-					if (resp.ok) xmlContent = await resp.text();
-				} catch (e) {
-					console.warn(
-						"[Sanctions] Failed to download from URL:",
-						(e as Error).message,
-					);
-				}
+			const raw = await fs.readFile(SANCTIONS_CACHE_JSON, "utf-8");
+			const parsed = JSON.parse(raw) as { names?: string[] } | string[];
+			let names: string[] = [];
+			if (Array.isArray(parsed)) names = parsed as string[];
+			else if (
+				parsed &&
+				typeof parsed === "object" &&
+				Array.isArray((parsed as { names?: string[] }).names)
+			)
+				names = (parsed as { names?: string[] }).names!;
+			if (names.length > 0) {
+				sanctionedNames = Array.from(
+					new Set(names.map(normalizeNameForMatch)),
+				).filter(Boolean);
+				buildFuse(sanctionedNames);
+				await saveSanctionsCache(sanctionedNames);
+				lastLoadedAt = Date.now();
+				console.log(
+					`[Sanctions] Loaded ${sanctionedNames.length} names (from ${SANCTIONS_CACHE_JSON})`,
+				);
+				return sanctionedNames;
 			}
 		}
-
-		if (!xmlContent) throw new Error("No XML content available");
-
-		const { parseStringPromise } = await import("xml2js");
-		const parsed = await parseStringPromise(xmlContent, {
-			explicitArray: false,
-			mergeAttrs: true,
-			normalize: true,
-			trim: true,
-		});
-		const individuals =
-			(parsed.CONSOLIDATED_LIST?.INDIVIDUALS?.INDIVIDUAL as unknown) || [];
-		const entities =
-			(parsed.CONSOLIDATED_LIST?.ENTITIES?.ENTITY as unknown) || [];
-
-		const names: string[] = [];
-
-		// helper to push normalized name
-		const pushName = (n?: string) => {
-			if (!n) return;
-			const norm = normalizeNameForMatch(n);
-			if (norm) names.push(norm);
-		};
-
-		const arrify = (x: unknown): unknown[] =>
-			x === undefined || x === null ? [] : Array.isArray(x) ? x : [x];
-
-		function getStringProp(obj: unknown, key: string): string | undefined {
-			if (!obj || typeof obj !== "object") return undefined;
-			const v = (obj as Record<string, unknown>)[key];
-			return typeof v === "string" ? v : undefined;
-		}
-
-		for (const ind of arrify(individuals)) {
-			if (ind && typeof ind === "object") {
-				const first = getStringProp(ind, "FIRST_NAME");
-				const second = getStringProp(ind, "SECOND_NAME");
-				const third = getStringProp(ind, "THIRD_NAME");
-				if (first || second)
-					pushName(`${first || ""} ${second || ""} ${third || ""}`);
-
-				const aliasContainer = (ind as Record<string, unknown>)[
-					"INDIVIDUAL_ALIAS"
-				];
-				const aliasNode =
-					aliasContainer && typeof aliasContainer === "object"
-						? (aliasContainer as Record<string, unknown>)["ALIAS"]
-						: undefined;
-				for (const a of arrify(aliasNode)) {
-					const aliasName = getStringProp(a, "ALIAS_NAME");
-					if (aliasName) pushName(aliasName);
-				}
-			}
-		}
-
-		for (const ent of arrify(entities)) {
-			if (ent && typeof ent === "object") {
-				const name = getStringProp(ent, "FIRST_NAME");
-				if (name) pushName(name);
-			}
-		}
-
-		sanctionedNames = Array.from(new Set(names)).filter(Boolean);
-		if (sanctionedNames.length === 0) {
-			// fallback
-			sanctionedNames = FALLBACK_NAMES;
-		}
-		buildFuse(sanctionedNames);
-		await saveSanctionsCache(sanctionedNames);
-		lastLoadedAt = Date.now();
-		console.log(
-			`[Sanctions] Loaded ${sanctionedNames.length} names (from XML or download)`,
-		);
-		return sanctionedNames;
 	} catch (err) {
-		console.warn(
-			"[Sanctions] Error parsing or loading sanctions list; using fallback list",
-			(err as Error).message,
-		);
-		sanctionedNames = FALLBACK_NAMES;
-		buildFuse(sanctionedNames);
-		lastLoadedAt = Date.now();
-		return sanctionedNames;
+		// ignore
 	}
+	console.warn("[Sanctions] Using fallback sanctions list");
+	sanctionedNames = Array.from(
+		new Set(FALLBACK_NAMES.map(normalizeNameForMatch)),
+	).filter(Boolean);
+	buildFuse(sanctionedNames);
+	lastLoadedAt = Date.now();
+	return sanctionedNames;
 }
-
-/* ===================== MAIN RISK SCORING FUNCTION ===================== */
 
 export async function calculateRiskScore(
 	application: ApplicationData,
@@ -425,56 +306,34 @@ export async function calculateRiskScore(
 		noRecentActivity: 0,
 		nonYouthLeadership: 0,
 		incompleteFields: 0,
-		
 		invalidData: 0,
 		total: 0,
 	};
-
 	const reasons: BreakdownReason[] = [];
-
-	// Ensure sanctions list is loaded (with cache/refresh logic)
 	await refreshSanctions();
-
-	// SANCTIONS CHECK
 	const sanctionMatches: {
 		inputName: string;
 		sanctionedName: string;
 		similarity: number;
 	}[] = [];
 	for (const leader of application.leadership) {
-		const norm = normalizeNameForMatch(leader.name);
-		if (fuse) {
-			const results = fuse.search(norm);
-			if (
-				results.length > 0 &&
-				typeof results[0].score === "number" &&
-				results[0].score <= FUZZY_THRESHOLD
-			) {
-				const rawScore = results[0].score ?? 1;
-				const similarity = Math.max(0, Math.min(1, 1 - rawScore)); // 0..1 where 1 = exact
-				sanctionMatches.push({
-					inputName: leader.name,
-					sanctionedName: results[0].item,
-					similarity,
-				});
-				// concise reason only (no NaN/percentage/details)
-				reasons.push({
-					category: "sanctions",
-					reason: `Sanctions Match Found: ${leader.name}`,
-				});
-			}
+		const name = leader?.name;
+		if (!name) continue;
+		const match: Awaited<ReturnType<typeof isSanctioned>> =
+			await isSanctioned(name);
+		if (match) {
+			sanctionMatches.push({
+				inputName: name,
+				sanctionedName: match.sanctionedName,
+				similarity: Math.max(0, Math.min(1, match.similarity)),
+			});
+			reasons.push({
+				category: "sanctions",
+				reason: `Sanctions match (${match.method}) for ${name}`,
+			});
 		}
 	}
-
-	// Filter out any empty or invalid matches (defensive)
-	const filteredSanctionMatches = sanctionMatches.filter(
-		(m) => m.inputName && m.sanctionedName && Number.isFinite(m.similarity),
-	);
-	if (filteredSanctionMatches.length > 0) {
-		breakdown.sanctionsMatch = 80;
-	}
-
-	// MISSING ID — treat undefined as false (form asks for first leader only sometimes)
+	if (sanctionMatches.length > 0) breakdown.sanctionsMatch = 80;
 	const leadersWithoutId = application.leadership.filter((l) => !l.hasId);
 	if (leadersWithoutId.length > 0) {
 		breakdown.missingId = leadersWithoutId.length * 20;
@@ -484,8 +343,6 @@ export async function calculateRiskScore(
 			value: leadersWithoutId.length,
 		});
 	}
-
-	// NO RECENT ACTIVITY
 	if (!application.hasRecentActivityProof) {
 		breakdown.noRecentActivity = 20;
 		reasons.push({
@@ -494,13 +351,9 @@ export async function calculateRiskScore(
 			value: 20,
 		});
 	}
-
-	// AGE VALIDATION & YOUTH CHECK
 	let invalidAgeCount = 0;
 	let youthCount = 0;
-
 	for (const leader of application.leadership) {
-		// Explicitly flag unrealistic provided ages (e.g., 225)
 		if (
 			typeof leader.age === "number" &&
 			(leader.age > MAX_VALID_AGE || leader.age < MIN_VALID_AGE)
@@ -511,9 +364,8 @@ export async function calculateRiskScore(
 				reason: `Unrealistic age (${leader.age}) for ${leader.name}`,
 				value: leader.age,
 			});
-			continue; // skip further checks for this leader
+			continue;
 		}
-
 		const age = safeCalculateAge(leader.dob, leader.age);
 		if (age === -1) {
 			invalidAgeCount++;
@@ -526,7 +378,6 @@ export async function calculateRiskScore(
 			if (age <= YOUTH_MAX_AGE) youthCount++;
 		}
 	}
-
 	const totalLeaders = application.leadership.length || 1;
 	const youthPercentage = youthCount / totalLeaders;
 	if (youthPercentage < 0.51) {
@@ -536,11 +387,7 @@ export async function calculateRiskScore(
 			reason: `Youth leadership ${Math.round(youthPercentage * 100)}% < 51%`,
 		});
 	}
-	if (invalidAgeCount > 0) {
-		breakdown.invalidData = invalidAgeCount * 25;
-	}
-
-	// INCOMPLETE FIELDS
+	if (invalidAgeCount > 0) breakdown.invalidData = invalidAgeCount * 25;
 	const requiredFields = [
 		application.organizationName?.trim(),
 		application.registrationNumber?.trim(),
@@ -557,40 +404,36 @@ export async function calculateRiskScore(
 			value: incompleteCount,
 		});
 	}
-
-
-	// TOTAL & LEVEL
 	breakdown.total = Object.values(breakdown).reduce(
 		(sum, v) => sum + (typeof v === "number" ? v : 0),
 		0,
 	);
 	const score = Math.min(breakdown.total, 100);
 	let level: "low" | "medium" | "high" | "critical" = "low";
-
-	// Determine risk level with "critical" criteria
 	if (
 		score >= 85 ||
 		sanctionMatches.length > 0 ||
 		invalidAgeCount > 2 ||
-		(breakdown.sanctionsMatch > 0)
+		breakdown.sanctionsMatch > 0
 	) {
 		level = "critical";
-	} else if (score >= 70 || invalidAgeCount > 0 ) {
+	} else if (score >= 70 || invalidAgeCount > 0) {
 		level = "high";
 	} else if (score >= 30) {
 		level = "medium";
 	}
-
+	const hasRequired = requiredFields.every((f) => !!f);
+	const autoApproveSuggested =
+		score <= 5 && sanctionMatches.length === 0 && hasRequired;
 	return {
 		score,
 		level,
 		breakdown,
 		reasons,
-		sanctionMatches: filteredSanctionMatches,
+		sanctionMatches,
+		autoApproveSuggested,
 	};
 }
-
-/* ===================== UTILS ===================== */
 
 export function getRiskBadgeColor(
 	level: "low" | "medium" | "high" | "critical",
@@ -603,15 +446,10 @@ export function getRiskBadgeColor(
 		case "high":
 			return "bg-red-100 text-red-800 border-red-200";
 		case "critical":
-			return "bg-red-900 text-white border-red-900"; // Dark red for critical
+			return "bg-red-900 text-white border-red-900";
 	}
 }
 
-/**
- * Returns a concise sanctions summary string.
- * - If matches exist: "Sanctions Match Found: NAME[, OTHER]"
- * - If none: "No sanctions match found"
- */
 export function formatSanctionsSummary(
 	matches: { inputName: string; sanctionedName: string; similarity: number }[],
 ): string {
@@ -620,5 +458,4 @@ export function formatSanctionsSummary(
 	return `Sanctions Match Found: ${uniq.join(", ")}`;
 }
 
-// Exported helpers for testing
 export { normalizeNameForMatch, parseDOBToDate };

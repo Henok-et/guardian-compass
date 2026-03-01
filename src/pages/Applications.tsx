@@ -9,7 +9,10 @@ import React, { useEffect, useState } from "react";
 import { LoadingSpinner } from "@/components/animation"; // adjust path
 
 const Applications = () => {
-	const { applications, isLoading, refetch } = useApplications();
+	// the hook exposes both the full list (`applications`) and a derived
+	// `pendingApplications` slice. use the latter for the review pool so we
+	// don't have to repeatedly filter here.
+	const { pendingApplications, isLoading, refetch } = useApplications();
 	const [searchQuery, setSearchQuery] = useState("");
 	const [riskFilter, setRiskFilter] = useState<
 		"all" | "low" | "medium" | "high" | "critical"
@@ -21,27 +24,28 @@ const Applications = () => {
 		console.log("[Applications Page] Refetched data on mount");
 	}, [refetch]);
 
-	// Debug: log what the hook provides
+	// Debug: log what the hook provides (pending slice only)
 	useEffect(() => {
-		console.log("[LIST PAGE] Total apps from hook:", applications.length);
+		console.log(
+			"[LIST PAGE] Total pending apps from hook:",
+			pendingApplications.length,
+		);
 		console.log(
 			"[LIST PAGE] Org names:",
-			applications.map((a) => a.organizationName || "Unnamed"),
+			pendingApplications.map((a) => a.organizationName || "Unnamed"),
 		);
 		console.log(
 			"[LIST PAGE] Statuses:",
-			applications.map((a) => a.status),
+			pendingApplications.map((a) => a.status),
 		);
 		console.log(
 			"[LIST PAGE] Risk levels:",
-			applications.map((a) => a.riskAssessment?.level || "none"),
+			pendingApplications.map((a) => a.riskAssessment?.level || "none"),
 		);
-	}, [applications]);
+	}, [pendingApplications]);
 
-	// Filter ONLY pending applications + search + risk
-	const pendingApps = applications.filter((app) => app.status === "pending");
-
-	const filteredApplications = pendingApps.filter((app) => {
+	// pendingApplications already contains only pending items
+	const filteredApplications = pendingApplications.filter((app) => {
 		const matchesSearch =
 			app.organizationName.toLowerCase().includes(searchQuery.toLowerCase()) ||
 			app.country.toLowerCase().includes(searchQuery.toLowerCase());

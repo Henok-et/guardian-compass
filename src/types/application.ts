@@ -30,6 +30,7 @@ export interface BaseApplication {
 // Application from API (with computed risk)
 export interface ApplicationWithRisk extends BaseApplication {
 	riskAssessment: {
+		autoApproveSuggested: boolean;
 		score: number;
 		level: "low" | "medium" | "high" | "critical";
 		breakdown: RiskBreakdown;

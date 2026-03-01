@@ -1,68 +1,99 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from "react";
 
 interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: 'admin' | 'officer';
+	id: string;
+	email: string;
+	name: string;
+	role: "admin" | "officer";
 }
 
-const AUTH_KEY = 'au_verification_auth';
-
-// Mock admin credentials
-const MOCK_USERS: Record<string, { password: string; user: User }> = {
-  'admin@au.int': {
-    password: 'admin123',
-    user: {
-      id: 'user-001',
-      email: 'admin@au.int',
-      name: 'AU Administrator',
-      role: 'admin',
-    },
-  },
-  'officer@au.int': {
-    password: 'officer123',
-    user: {
-      id: 'user-002',
-      email: 'officer@au.int',
-      name: 'Verification Officer',
-      role: 'officer',
-    },
-  },
-};
+const AUTH_KEY = "au_verification_auth";
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+	const [user, setUser] = useState<User | null>(null);
+	const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const stored = localStorage.getItem(AUTH_KEY);
-    if (stored) {
-      setUser(JSON.parse(stored));
-    }
-    setIsLoading(false);
-  }, []);
+	useEffect(() => {
+		try {
+			const stored = localStorage.getItem(AUTH_KEY);
+			if (stored) {
+				const parsed = JSON.parse(stored);
+				if (parsed && parsed.user) {
+					setUser(parsed.user as User);
+				}
+			}
+		} catch (e) {
+			// ignore
+		}
+		setIsLoading(false);
+	}, []);
 
-  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
-    const mockUser = MOCK_USERS[email.toLowerCase()];
-    if (mockUser && mockUser.password === password) {
-      setUser(mockUser.user);
-      localStorage.setItem(AUTH_KEY, JSON.stringify(mockUser.user));
-      return true;
-    }
-    return false;
-  }, []);
+	const login = useCallback(
+		async (email: string, password: string): Promise<boolean> => {
+			// Try server login first
+			try {
+				const res = await fetch("/api/login", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ username: email, password }),
+				});
+				if (res.ok) {
+					const data = await res.json();
+					const token = data?.token;
+					const userObj: User = {
+						id: "server-user",
+						email,
+						name: email,
+						role: "admin",
+					};
+					setUser(userObj);
+					localStorage.setItem(
+						AUTH_KEY,
+						JSON.stringify({ user: userObj, token }),
+					);
+					return true;
+				}
+			} catch (e) {
+				console.warn("Server login failed, falling back to demo auth");
+			}
 
-  const logout = useCallback(() => {
-    setUser(null);
-    localStorage.removeItem(AUTH_KEY);
-  }, []);
+			// Fallback: allow demo credentials for offline/demo mode
+			const demoOk =
+				(email === "admin@au.int" && password === "admin123") ||
+				(email === "officer@au.int" && password === "officer123");
+			if (demoOk) {
+				const userObj: User = {
+					id: email === "admin@au.int" ? "user-001" : "user-002",
+					email,
+					name:
+						email === "admin@au.int"
+							? "AU Administrator"
+							: "Verification Officer",
+					role: email === "admin@au.int" ? "admin" : "officer",
+				};
+				setUser(userObj);
+				localStorage.setItem(
+					AUTH_KEY,
+					JSON.stringify({ user: userObj, token: null }),
+				);
+				return true;
+			}
 
-  return {
-    user,
-    isLoading,
-    isAuthenticated: !!user,
-    login,
-    logout,
-  };
+			return false;
+		},
+		[],
+	);
+
+	const logout = useCallback(() => {
+		setUser(null);
+		localStorage.removeItem(AUTH_KEY);
+	}, []);
+
+	return {
+		user,
+		isLoading,
+		isAuthenticated: !!user,
+		login,
+		logout,
+	};
 }

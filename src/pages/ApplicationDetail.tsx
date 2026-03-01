@@ -72,6 +72,9 @@ const ApplicationDetail = () => {
 	const [flagNotes, setFlagNotes] = useState("");
 	const [rejectReason, setRejectReason] = useState("");
 
+	// Notification toggle
+	const [notifyApplicant, setNotifyApplicant] = useState(false);
+
 	// Duplicate alert
 	const [showDuplicateAlert, setShowDuplicateAlert] = useState(false);
 	const [duplicateInfo, setDuplicateInfo] = useState<{
@@ -238,8 +241,8 @@ const ApplicationDetail = () => {
 	const handleApprove = async () => {
 		setIsActionLoading(true);
 		try {
-			// Update in your main applications hook
-			approveApplication(application.id);
+			// Update in your main applications hook and wait for persistence
+			await approveApplication(application.id);
 
 			// Track the approval
 			applicationTracker.trackAction(
@@ -248,8 +251,36 @@ const ApplicationDetail = () => {
 				"Application approved",
 			);
 
-			// Refresh all lists (this makes approved item disappear from pending)
-			refetch();
+			// state already updated locally; no immediate refetch to avoid
+			// overwriting flags/rejections with stale storage data
+			// (refetch can be triggered manually if needed)
+			// refetch();
+
+			// Optionally notify applicant
+			if (notifyApplicant && application.email) {
+				try {
+					const tokenRaw = localStorage.getItem("au_verification_auth");
+					const token = tokenRaw ? JSON.parse(tokenRaw).token || null : null;
+					await fetch(
+						`/api/applications/${encodeURIComponent(application.id)}/notify`,
+						{
+							method: "POST",
+							headers: Object.assign(
+								{ "Content-Type": "application/json" },
+								token ? { Authorization: `Bearer ${token}` } : {},
+							),
+							body: JSON.stringify({
+								to: application.email,
+								status: "approved",
+							}),
+						},
+					);
+					toast.success("Applicant notified");
+				} catch (e) {
+					console.warn("Notify failed", e);
+					toast.error("Failed to notify applicant");
+				}
+			}
 
 			// Show success message (using toast instead of alert - better UX)
 			toast.success("Organization approved successfully!");
@@ -267,8 +298,8 @@ const ApplicationDetail = () => {
 	const handleFlag = async () => {
 		setIsActionLoading(true);
 		try {
-			// Update in your main applications hook
-			flagApplication(application.id);
+			// Update in your main applications hook and wait for persistence
+			await flagApplication(application.id);
 
 			// Track the flagging
 			applicationTracker.trackAction(
@@ -277,8 +308,33 @@ const ApplicationDetail = () => {
 				flagNotes || "Flagged for investigation",
 			);
 
-			// Refresh lists
-			refetch();
+			// state already updated locally; don't refetch immediately (avoids stale storage)
+			// refetch();
+
+			if (notifyApplicant && application.email) {
+				try {
+					const tokenRaw = localStorage.getItem("au_verification_auth");
+					const token = tokenRaw ? JSON.parse(tokenRaw).token || null : null;
+					await fetch(
+						`/api/applications/${encodeURIComponent(application.id)}/notify`,
+						{
+							method: "POST",
+							headers: Object.assign(
+								{ "Content-Type": "application/json" },
+								token ? { Authorization: `Bearer ${token}` } : {},
+							),
+							body: JSON.stringify({
+								to: application.email,
+								status: "flagged",
+							}),
+						},
+					);
+					toast.success("Applicant notified");
+				} catch (e) {
+					console.warn("Notify failed", e);
+					toast.error("Failed to notify applicant");
+				}
+			}
 
 			// Success message
 			toast.success("Application flagged for investigation!");
@@ -298,8 +354,8 @@ const ApplicationDetail = () => {
 	const handleReject = async () => {
 		setIsActionLoading(true);
 		try {
-			// Update in your main applications hook
-			rejectApplication(application.id);
+			// Update in your main applications hook and wait for persistence
+			await rejectApplication(application.id);
 
 			// Track the rejection
 			applicationTracker.trackAction(
@@ -308,8 +364,33 @@ const ApplicationDetail = () => {
 				rejectReason || "Application rejected",
 			);
 
-			// Refresh lists
-			refetch();
+			// state already updated locally; avoid refetch for the same reason as flag
+			// refetch();
+
+			if (notifyApplicant && application.email) {
+				try {
+					const tokenRaw = localStorage.getItem("au_verification_auth");
+					const token = tokenRaw ? JSON.parse(tokenRaw).token || null : null;
+					await fetch(
+						`/api/applications/${encodeURIComponent(application.id)}/notify`,
+						{
+							method: "POST",
+							headers: Object.assign(
+								{ "Content-Type": "application/json" },
+								token ? { Authorization: `Bearer ${token}` } : {},
+							),
+							body: JSON.stringify({
+								to: application.email,
+								status: "rejected",
+							}),
+						},
+					);
+					toast.success("Applicant notified");
+				} catch (e) {
+					console.warn("Notify failed", e);
+					toast.error("Failed to notify applicant");
+				}
+			}
 
 			// Success message
 			toast.success("Application rejected!");
