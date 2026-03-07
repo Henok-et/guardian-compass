@@ -71,7 +71,6 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 							);
 						})}
 					</nav>
-
 					<div className="flex items-center gap-4">
 						{user ? (
 							<div className="flex items-center gap-3">

@@ -26,20 +26,17 @@ const FlaggedApplications = () => {
 	const {
 		flaggedApps: hookFlaggedApps,
 		rejectedApps: hookRejectedApps,
+		approveApplication,
+		refetch,
 		isLoading,
 	} = useApplications();
 	const navigate = useNavigate();
 	const [processingId, setProcessingId] = useState<string | null>(null);
 
-	// Combine data from hook and tracker for flagged apps
-	const flaggedApps = [
-		...hookFlaggedApps,
-		...applicationTracker.getFlaggedApplications(),
-	];
-	const rejectedApps = [
-		...hookRejectedApps,
-		...applicationTracker.getRejectedApplications(),
-	];
+	// Primary source of truth is the backend-driven hook state.
+	// The local tracker is kept only for backwards compatibility and export.
+	const flaggedApps = hookFlaggedApps;
+	const rejectedApps = hookRejectedApps;
 
 	// Remove duplicates (same app might be in both hook and tracker)
 	const uniqueFlaggedApps = Array.from(
@@ -53,31 +50,28 @@ const FlaggedApplications = () => {
 		applicationTracker.exportToExcel(type);
 	};
 
-	const handleApproveFromFlagged = (appId: string) => {
+	const handleApproveFromFlagged = async (appId: string) => {
 		setProcessingId(appId);
-
-		// Find the application
-		const app = uniqueFlaggedApps.find((a) => a.id === appId);
-		if (app) {
-			// Track as approved
-			applicationTracker.trackAction(
-				app,
-				"approved",
-				"Approved after investigation",
-			);
-
-			// Remove from tracker's flagged list
-			applicationTracker.removeFromFlagged(appId);
-
-			// Update in hook if it exists there
-			// You might need to add an approve function to your useApplications hook
-
-			setTimeout(() => {
-				setProcessingId(null);
-				alert("Organization approved successfully!");
-				// Refresh the page to show updated list
-				window.location.reload();
-			}, 1000);
+		try {
+			await approveApplication(appId);
+			// Optionally keep local tracker data for backward compatibility
+			const app = uniqueFlaggedApps.find((a) => a.id === appId);
+			if (app) {
+				applicationTracker.trackAction(
+					app,
+					"approved",
+					"Approved after investigation",
+				);
+				applicationTracker.removeFromFlagged(appId);
+			}
+			// Refresh latest data from backend
+			refetch();
+			alert("Organization approved successfully!");
+		} catch (err) {
+			console.error(err);
+			alert("Failed to approve application.");
+		} finally {
+			setProcessingId(null);
 		}
 	};
 

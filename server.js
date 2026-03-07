@@ -6,6 +6,7 @@ import path from "path";
 import { initializeGoogleSheets } from "./services/sheetsService.js";
 import applicationsRouter from "./routes/applications.js";
 import { readWorkflow, writeWorkflow } from "./utils/workflow.js";
+import { ping as pingMongo } from "./utils/mongo.js";
 import jwt from "jsonwebtoken";
 import sgMail from "@sendgrid/mail";
 
@@ -55,12 +56,54 @@ console.log("Starting AU Youth Registrar server...");
 		);
 		// Continue anyway – don't crash server
 	}
+
+	// Report MongoDB connectivity
+	try {
+		const mongoStatus = await pingMongo();
+		if (mongoStatus.ok) {
+			console.log("MongoDB connection: OK");
+		} else {
+			console.warn("MongoDB connection: FAILED", mongoStatus.error);
+		}
+	} catch (err) {
+		console.warn("MongoDB connection: FAILED", err?.message || err);
+	}
 })();
 
 // ──────────────────────────────────────────────────────────────
 // Routes
 // ──────────────────────────────────────────────────────────────
 app.use("/api/applications", applicationsRouter);
+
+// Health check endpoint
+app.get("/api/health", async (req, res) => {
+	const mongo = await pingMongo();
+	res.json({
+		ok: true,
+		mongo: mongo.ok ? "connected" : "error",
+		mongoError: mongo.ok ? undefined : mongo.error,
+	});
+});
+
+// Workflow inspection endpoint (returns stored state)
+app.get("/api/workflow", async (req, res) => {
+	try {
+		const workflow = await readWorkflow();
+		res.json({ ok: true, workflow });
+	} catch (err) {
+		res.status(500).json({ ok: false, error: err?.message || String(err) });
+	}
+});
+
+// Reset workflow state (for development/testing)
+app.post("/api/workflow/reset", async (req, res) => {
+	try {
+		await writeWorkflow({ verified: [], flagged: [], rejected: [] });
+		res.json({ ok: true });
+	} catch (err) {
+		res.status(500).json({ ok: false, error: err?.message || String(err) });
+	}
+});
 
 // SendGrid notification endpoint with beautiful HTML templates
 app.post("/api/applications/:id/notify", async (req, res) => {
@@ -234,7 +277,9 @@ app.post("/api/applications/:id/notify", async (req, res) => {
 				incompleteFields: "Incomplete Fields",
 				invalidData: "Invalid Data",
 			};
-			const rows = Object.entries(breakdown).filter(([k]) => k !== "total");
+			const rows = Object.entries(breakdown).filter(
+				([k, v]) => k !== "total" && (typeof v !== "number" || v !== 0),
+			);
 			if (!rows.length && (!reasons || reasons.length === 0)) return "";
 			let html = `
 				<div style="background:#fff9f0;border-radius:6px;padding:14px;margin:18px 0;border:1px solid #fde3b7">
@@ -269,8 +314,19 @@ app.post("/api/applications/:id/notify", async (req, res) => {
 		const clientRiskHtml = req.body?.riskSummaryHtml;
 		const clientBreakdown = req.body?.breakdown;
 		const clientReasons = req.body?.reasons;
+		const extraNotes = req.body?.extra?.notes;
+		const safeNotes = extraNotes
+			? String(extraNotes)
+					.replace(/</g, "&lt;")
+					.replace(/>/g, "&gt;")
+					.replace(/\n/g, "<br/>")
+			: "";
+		const notesHtml = safeNotes
+			? `<div style="background:#eef2ff;border-radius:6px;padding:14px;margin:18px 0;border:1px solid #c3dafe"><p style="margin:0 0 8px;font-weight:600;color:#1e3a8a">Investigation Notes</p><p style="margin:0;white-space:pre-wrap;">${safeNotes}</p></div>`
+			: "";
 		const riskSection =
-			clientRiskHtml || buildRiskHtml(clientBreakdown, clientReasons);
+			notesHtml +
+			(clientRiskHtml || buildRiskHtml(clientBreakdown, clientReasons));
 
 		// Enhanced email message with proper sender name and reply-to
 		// Inject the riskSection into the HTML template (before the signature block)
@@ -287,6 +343,11 @@ app.post("/api/applications/:id/notify", async (req, res) => {
 			}
 		}
 
+		const plainTextNotes = extraNotes ? `\n\nNotes:\n${extraNotes}` : "";
+		const text =
+			(textMap[statusLower] || `Status update for application ${id}`) +
+			plainTextNotes;
+
 		const msg = {
 			to,
 			from: {
@@ -295,7 +356,7 @@ app.post("/api/applications/:id/notify", async (req, res) => {
 			},
 			replyTo: "youth@au.int",
 			subject: subjectMap[statusLower] || `Update on Application ${id}`,
-			text: textMap[statusLower] || `Status update for application ${id}`,
+			text,
 			html: finalHtml,
 		};
 

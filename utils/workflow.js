@@ -1,30 +1,28 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+import { getCollection } from "./mongo.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const WORKFLOW_JSON = path.join(__dirname, "..", "workflow.json");
+const WORKFLOW_COLLECTION = "workflow";
+const WORKFLOW_ID = "workflow";
 
 export async function readWorkflow() {
 	try {
-		if (!fs.existsSync(WORKFLOW_JSON))
-			return { verified: [], flagged: [], rejected: [] };
-		const raw = await fs.promises.readFile(WORKFLOW_JSON, "utf-8");
-		return JSON.parse(raw);
+		const col = await getCollection(WORKFLOW_COLLECTION);
+		const doc = await col.findOne({ _id: WORKFLOW_ID });
+		return doc || { verified: [], flagged: [], rejected: [] };
 	} catch (e) {
+		console.warn("Failed to read workflow from MongoDB:", e?.message || e);
 		return { verified: [], flagged: [], rejected: [] };
 	}
 }
 
 export async function writeWorkflow(data) {
 	try {
-		await fs.promises.writeFile(
-			WORKFLOW_JSON,
-			JSON.stringify(data, null, 2),
-			"utf-8",
+		const col = await getCollection(WORKFLOW_COLLECTION);
+		await col.updateOne(
+			{ _id: WORKFLOW_ID },
+			{ $set: { ...data, _id: WORKFLOW_ID } },
+			{ upsert: true },
 		);
 	} catch (e) {
-		console.warn("Failed to write workflow.json", e?.message || e);
+		console.warn("Failed to write workflow to MongoDB:", e?.message || e);
 	}
 }

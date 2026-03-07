@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
 	ApplicationData,
 	calculateRiskScore,
@@ -9,10 +9,6 @@ import type {
 	ApplicationWithRisk,
 	TrackedApplication,
 } from "@/types/application";
-
-const VERIFIED_KEY = "au_verified_organizations";
-const FLAGGED_KEY = "au_flagged_applications";
-const REJECTED_KEY = "au_rejected_applications";
 
 // helper moved out of the hook so callbacks can reference it without having to
 // add it to every dependency list. returning `string | null` matches the
@@ -33,9 +29,6 @@ export function useApplications() {
 		[],
 	);
 	const [applications, setApplications] = useState<ApplicationWithRisk[]>([]);
-	const [verifiedOrgs, setVerifiedOrgs] = useState<ApplicationWithRisk[]>([]);
-	const [flaggedApps, setFlaggedApps] = useState<ApplicationWithRisk[]>([]);
-	const [rejectedApps, setRejectedApps] = useState<ApplicationWithRisk[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
@@ -43,9 +36,6 @@ export function useApplications() {
 	const loadData = useCallback(async () => {
 		setIsLoading(true);
 		setError(null);
-
-		// One-time cleanup of old full list key
-		localStorage.removeItem("au_verification_applications");
 
 		try {
 			// Fetch from backend
@@ -68,59 +58,68 @@ export function useApplications() {
 				}),
 			);
 
-			// Load workflow states from localStorage early so we can merge and apply auto-approve
-			let storedVerifiedList: ApplicationWithRisk[] = [];
-			let storedFlaggedList: ApplicationWithRisk[] = [];
-			let storedRejectedList: ApplicationWithRisk[] = [];
+			// Fetch persisted workflow state from backend/Mongo
+			let workflow: any = { verified: [], flagged: [], rejected: [] };
 			try {
-				const sv = localStorage.getItem(VERIFIED_KEY);
-				if (sv) storedVerifiedList = JSON.parse(sv) as ApplicationWithRisk[];
-				const sf = localStorage.getItem(FLAGGED_KEY);
-				if (sf) storedFlaggedList = JSON.parse(sf) as ApplicationWithRisk[];
-				const sr = localStorage.getItem(REJECTED_KEY);
-				if (sr) storedRejectedList = JSON.parse(sr) as ApplicationWithRisk[];
+				const wfResp = await fetch("/api/workflow");
+				if (wfResp.ok) {
+					const wfJson = await wfResp.json();
+					workflow = wfJson.workflow || workflow;
+				}
 			} catch (e) {
-				console.error("Error reading workflow localStorage during load:", e);
+				console.warn("Failed to fetch workflow state:", e);
 			}
 
-			// Apply auto-approve suggestions: if risk suggests auto-approve and not already in any list
-			const idsInWorkflow = new Set([
-				...storedVerifiedList.map((a) => a.id),
-				...storedFlaggedList.map((a) => a.id),
-				...storedRejectedList.map((a) => a.id),
-			]);
-
-			// Build id->status map from stored workflow lists
-			const idToStoredStatus = new Map<string, ApplicationWithRisk["status"]>();
-			storedVerifiedList.forEach((a) => idToStoredStatus.set(a.id, "approved"));
-			storedFlaggedList.forEach((a) => idToStoredStatus.set(a.id, "flagged"));
-			storedRejectedList.forEach((a) => idToStoredStatus.set(a.id, "rejected"));
-
-			const updatedApps = appsWithRisk.map((app) => {
-				const stored = idToStoredStatus.get(app.id);
-				if (stored) return { ...app, status: stored } as ApplicationWithRisk;
-				if (
-					app.riskAssessment?.autoApproveSuggested &&
-					!idsInWorkflow.has(app.id)
-				) {
-					// mark approved locally
-					storedVerifiedList.push({ ...app, status: "approved" });
-					idsInWorkflow.add(app.id);
-					return { ...app, status: "approved" } as ApplicationWithRisk;
-				}
-				return app;
+			// Merge persisted workflow status into our app list (fallback for server-side merge bugs)
+			const appsById = new Map<string, ApplicationWithRisk>();
+			const appsByEmail = new Map<string, ApplicationWithRisk>();
+			const appsByReg = new Map<string, ApplicationWithRisk>();
+			appsWithRisk.forEach((app) => {
+				appsById.set(app.id, app);
+				if (app.email) appsByEmail.set(app.email.toLowerCase(), app);
+				if (app.registrationNumber)
+					appsByReg.set(app.registrationNumber.toLowerCase(), app);
 			});
 
-			// Store ALL applications and apply merged statuses
+			const applyPersisted = (
+				list: any[],
+				status: ApplicationWithRisk["status"],
+			) => {
+				(list || []).forEach((stored) => {
+					const id = stored?.id;
+					const email = stored?.email;
+					const reg = stored?.registrationNumber;
+					const app =
+						(id && appsById.get(id)) ||
+						(email && appsByEmail.get(String(email).toLowerCase())) ||
+						(reg && appsByReg.get(String(reg).toLowerCase()));
+					if (app) {
+						app.status = status;
+						app.actionDate = stored?.actionDate || new Date().toISOString();
+					}
+				});
+			};
+
+			applyPersisted(workflow.verified, "approved");
+			applyPersisted(workflow.flagged, "flagged");
+			applyPersisted(workflow.rejected, "rejected");
+
+			const updatedApps = appsWithRisk;
+
+			// Store ALL applications and keep derived lists in sync
 			setAllApplications(updatedApps);
-
-			// Only keep pending applications in the main list
 			setApplications(updatedApps.filter((a) => a.status === "pending"));
-
-			// initialize workflow lists from localStorage + auto-approvals
-			setVerifiedOrgs(storedVerifiedList);
-			setFlaggedApps(storedFlaggedList);
-			setRejectedApps(storedRejectedList);
+			console.log(
+				"[useApplications] loaded apps:",
+				updatedApps.length,
+				"(pending:",
+				updatedApps.filter((a) => a.status === "pending").length,
+				"flagged:",
+				updatedApps.filter((a) => a.status === "flagged").length,
+				"rejected:",
+				updatedApps.filter((a) => a.status === "rejected").length,
+				")",
+			);
 		} catch (err: unknown) {
 			console.error("Failed to load applications:", err);
 			const message = err instanceof Error ? err.message : "Unknown error";
@@ -139,49 +138,10 @@ export function useApplications() {
 		loadData();
 	}, [loadData]);
 
-	// Persist workflow states
-	useEffect(() => {
-		if (!isLoading) {
-			localStorage.setItem(VERIFIED_KEY, JSON.stringify(verifiedOrgs));
-			localStorage.setItem(FLAGGED_KEY, JSON.stringify(flaggedApps));
-			localStorage.setItem(REJECTED_KEY, JSON.stringify(rejectedApps));
-		}
-	}, [verifiedOrgs, flaggedApps, rejectedApps, isLoading]);
-
 	// ── Actions ────────────────────────────────────────────────
-
-	// helper for removing an application from the pending list. extracted so
-	// the same implementation can be shared by all three action helpers.
-	const removeFromPending = useCallback((id: string) => {
-		setApplications((prev) => prev.filter((a) => a.id !== id));
-	}, []);
 
 	const approveApplication = useCallback(
 		async (id: string) => {
-			// update the global list first so every consumer sees the new status
-			setAllApplications((prev) =>
-				prev.map((app) =>
-					app.id === id ? { ...app, status: "approved" as const } : app,
-				),
-			);
-
-			// remove it from the pending list
-			removeFromPending(id);
-
-			// find the application info in the master list so we can persist to
-			// the verified array (use the previous value of allApplications
-			// which will always contain the record, even if it has already been
-			// processed elsewhere)
-			const appToMove = allApplications.find((a) => a.id === id);
-			if (appToMove) {
-				const copy = { ...appToMove, status: "approved" as const };
-				setVerifiedOrgs((prevV) => {
-					const updated = [...prevV, copy];
-					localStorage.setItem(VERIFIED_KEY, JSON.stringify(updated));
-					return updated;
-				});
-			}
-
 			try {
 				const token = getStoredToken();
 				await fetch(`/api/applications/${encodeURIComponent(id)}/approve`, {
@@ -191,33 +151,16 @@ export function useApplications() {
 						token ? { Authorization: `Bearer ${token}` } : {},
 					),
 				});
+				await loadData();
 			} catch (e) {
 				console.warn("Failed to persist approve to server:", e);
 			}
 		},
-		[allApplications, removeFromPending],
+		[loadData],
 	);
 
 	const rejectApplication = useCallback(
 		async (id: string) => {
-			setAllApplications((prev) =>
-				prev.map((app) =>
-					app.id === id ? { ...app, status: "rejected" as const } : app,
-				),
-			);
-
-			removeFromPending(id);
-
-			const appToMove = allApplications.find((a) => a.id === id);
-			if (appToMove) {
-				const copy = { ...appToMove, status: "rejected" as const };
-				setRejectedApps((prevR) => {
-					const updated = [...prevR, copy];
-					localStorage.setItem(REJECTED_KEY, JSON.stringify(updated));
-					return updated;
-				});
-			}
-
 			try {
 				const token = getStoredToken();
 				await fetch(`/api/applications/${encodeURIComponent(id)}/reject`, {
@@ -227,33 +170,16 @@ export function useApplications() {
 						token ? { Authorization: `Bearer ${token}` } : {},
 					),
 				});
+				await loadData();
 			} catch (e) {
 				console.warn("Failed to persist reject to server:", e);
 			}
 		},
-		[allApplications, removeFromPending],
+		[loadData],
 	);
 
 	const flagApplication = useCallback(
 		async (id: string) => {
-			setAllApplications((prev) =>
-				prev.map((app) =>
-					app.id === id ? { ...app, status: "flagged" as const } : app,
-				),
-			);
-
-			removeFromPending(id);
-
-			const appToMove = allApplications.find((a) => a.id === id);
-			if (appToMove) {
-				const copy = { ...appToMove, status: "flagged" as const };
-				setFlaggedApps((prevF) => {
-					const updated = [...prevF, copy];
-					localStorage.setItem(FLAGGED_KEY, JSON.stringify(updated));
-					return updated;
-				});
-			}
-
 			try {
 				const token = getStoredToken();
 				await fetch(`/api/applications/${encodeURIComponent(id)}/flag`, {
@@ -263,11 +189,12 @@ export function useApplications() {
 						token ? { Authorization: `Bearer ${token}` } : {},
 					),
 				});
+				await loadData();
 			} catch (e) {
 				console.warn("Failed to persist flag to server:", e);
 			}
 		},
-		[allApplications, removeFromPending],
+		[loadData],
 	);
 
 	// ── Refetch ─────────────────────────────────────────────────
@@ -280,44 +207,66 @@ export function useApplications() {
 
 	const getApplicationById = useCallback(
 		(id: string) => {
-			return (
-				applications.find((a) => a.id === id) ||
-				verifiedOrgs.find((a) => a.id === id) ||
-				flaggedApps.find((a) => a.id === id) ||
-				rejectedApps.find((a) => a.id === id)
-			);
+			return allApplications.find((a) => a.id === id);
 		},
-		[applications, verifiedOrgs, flaggedApps, rejectedApps],
+		[allApplications],
 	);
 
 	// ── Stats ──────────────────────────────────────────────────
+	const stats = useMemo(() => {
+		const base = {
+			total: 0,
+			pending: 0,
+			approved: 0,
+			flagged: 0,
+			rejected: 0,
+			highRisk: 0,
+		};
 
-	const stats = {
-		// Combine ALL sources for total count
-		total: allApplications.length,
-		// Pending from server
-		pending: applications.length,
-		// Approved from localStorage
-		approved: verifiedOrgs.length,
-		// Flagged from localStorage
-		flagged: flaggedApps.length,
-		// Rejected from localStorage
-		rejected: rejectedApps.length,
-		// High risk from allApplications
-		highRisk: allApplications.filter(
-			(a) =>
-				a.riskAssessment?.level === "high" ||
-				a.riskAssessment?.level === "critical",
-		).length,
-	};
+		return allApplications.reduce((acc, app) => {
+			acc.total += 1;
+			switch (app.status) {
+				case "approved":
+					acc.approved += 1;
+					break;
+				case "flagged":
+					acc.flagged += 1;
+					break;
+				case "rejected":
+					acc.rejected += 1;
+					break;
+				case "pending":
+				default:
+					acc.pending += 1;
+			}
+
+			if (
+				app.riskAssessment?.level === "high" ||
+				app.riskAssessment?.level === "critical"
+			) {
+				acc.highRisk += 1;
+			}
+
+			return acc;
+		}, base);
+	}, [allApplications]);
 
 	const resetData = useCallback(() => {
-		localStorage.removeItem(VERIFIED_KEY);
-		localStorage.removeItem(FLAGGED_KEY);
-		localStorage.removeItem(REJECTED_KEY);
-		localStorage.removeItem("au_verification_applications");
 		loadData();
 	}, [loadData]);
+
+	const verifiedOrgs = useMemo(
+		() => allApplications.filter((a) => a.status === "approved"),
+		[allApplications],
+	);
+	const flaggedApps = useMemo(
+		() => allApplications.filter((a) => a.status === "flagged"),
+		[allApplications],
+	);
+	const rejectedApps = useMemo(
+		() => allApplications.filter((a) => a.status === "rejected"),
+		[allApplications],
+	);
 
 	return {
 		// For dashboard: use allApplications to get everything

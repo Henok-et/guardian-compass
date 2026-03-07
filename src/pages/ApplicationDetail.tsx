@@ -260,7 +260,7 @@ const ApplicationDetail = () => {
 		lines.push(`Level: ${ra.level.toUpperCase()}`);
 		lines.push("Breakdown:");
 		Object.entries(ra.breakdown)
-			.filter(([k]) => k !== "total")
+			.filter(([k, v]) => k !== "total" && (typeof v !== "number" || v !== 0))
 			.forEach(([k, v]) => {
 				lines.push(` - ${k}: ${v}`);
 			});
@@ -290,7 +290,7 @@ const ApplicationDetail = () => {
 			`<table style="width:100%;border-collapse:collapse;margin-bottom:.5rem;"><thead><tr><th style="text-align:left;padding:.25rem 0;">Category</th><th style="text-align:right;padding:.25rem 0;">Points</th></tr></thead><tbody>`,
 		);
 		Object.entries(ra.breakdown)
-			.filter(([k]) => k !== "total")
+			.filter(([k, v]) => k !== "total" && (typeof v !== "number" || v !== 0))
 			.forEach(([k, v]) => {
 				parts.push(
 					`<tr><td style="padding:.125rem 0;">${k}</td><td style="padding:.125rem 0;text-align:right;">${v}</td></tr>`,
@@ -309,6 +309,35 @@ const ApplicationDetail = () => {
 			parts.push(`</ul>`);
 		}
 		return parts.join("");
+	};
+
+	// Build notification payloads (includes notes for flagged/rejected and filters zero-valued risk breakdown items)
+	const getNotifyPayload = (status: "approved" | "flagged" | "rejected") => {
+		const filteredBreakdown = Object.fromEntries(
+			Object.entries(riskAssessment.breakdown || {}).filter(
+				([k, v]) =>
+					k === "total" || (typeof v === "number" ? v !== 0 : Boolean(v)),
+			),
+		);
+
+		const extra: Record<string, any> = {
+			orgName: application.organizationName,
+		};
+		if (status === "flagged" && flagNotes?.trim()) {
+			extra.notes = flagNotes.trim();
+		} else if (status === "rejected" && rejectReason?.trim()) {
+			extra.notes = rejectReason.trim();
+		}
+
+		return {
+			to: application.email,
+			status,
+			extra,
+			riskSummary: formatRiskSummary(riskAssessment),
+			riskSummaryHtml: formatRiskSummaryHtml(riskAssessment),
+			breakdown: filteredBreakdown,
+			reasons: riskAssessment.reasons,
+		};
 	};
 
 	// Enhanced action handlers with tracking
@@ -343,14 +372,7 @@ const ApplicationDetail = () => {
 								{ "Content-Type": "application/json" },
 								token ? { Authorization: `Bearer ${token}` } : {},
 							),
-							body: JSON.stringify({
-								to: application.email,
-								status: "approved",
-								riskSummary: formatRiskSummary(riskAssessment),
-								riskSummaryHtml: formatRiskSummaryHtml(riskAssessment),
-								breakdown: riskAssessment.breakdown,
-								reasons: riskAssessment.reasons,
-							}),
+							body: JSON.stringify(getNotifyPayload("approved")),
 						},
 					);
 					toast.success("Applicant notified");
@@ -401,14 +423,7 @@ const ApplicationDetail = () => {
 								{ "Content-Type": "application/json" },
 								token ? { Authorization: `Bearer ${token}` } : {},
 							),
-							body: JSON.stringify({
-								to: application.email,
-								status: "flagged",
-								riskSummary: formatRiskSummary(riskAssessment),
-								riskSummaryHtml: formatRiskSummaryHtml(riskAssessment),
-								breakdown: riskAssessment.breakdown,
-								reasons: riskAssessment.reasons,
-							}),
+							body: JSON.stringify(getNotifyPayload("flagged")),
 						},
 					);
 					toast.success("Applicant notified");
@@ -461,14 +476,7 @@ const ApplicationDetail = () => {
 								{ "Content-Type": "application/json" },
 								token ? { Authorization: `Bearer ${token}` } : {},
 							),
-							body: JSON.stringify({
-								to: application.email,
-								status: "rejected",
-								riskSummary: formatRiskSummary(riskAssessment),
-								riskSummaryHtml: formatRiskSummaryHtml(riskAssessment),
-								breakdown: riskAssessment.breakdown,
-								reasons: riskAssessment.reasons,
-							}),
+							body: JSON.stringify(getNotifyPayload("rejected")),
 						},
 					);
 					toast.success("Applicant notified");
