@@ -106,13 +106,14 @@ const AFRICAN_COUNTRIES = [
 	"Zimbabwe",
 ];
 
-// Colors for charts
+// Colors for charts (use theme variables for consistent AU branding)
+// NOTE: our CSS variables store HSL components, so we wrap them with `hsl(...)` to form valid CSS colors.
 const COLORS = {
-	approved: "#22c55e",
-	pending: "#eab308",
-	rejected: "#ef4444",
-	flagged: "#f97316",
-	country: "#3b82f6",
+	approved: "hsl(var(--success))",
+	pending: "hsl(var(--warning))",
+	rejected: "hsl(var(--error))",
+	flagged: "hsl(var(--primary))",
+	country: "hsl(var(--primary))",
 };
 
 const Dashboard = memo(() => {
@@ -310,9 +311,7 @@ const Dashboard = memo(() => {
 						</Select>
 					</div>
 					<div className="flex flex-col items-end gap-2">
-						<h1 className="text-3xl font-bold">Registration Dashboard</h1>
 						<p className="text-muted-foreground mt-1">
-							Youth‑Led Organizations Across Africa
 							{selectedCountry !== "all" && selectedCountry && (
 								<span className="ml-2 font-medium text-primary">
 									• {selectedCountry}
@@ -363,10 +362,10 @@ const Dashboard = memo(() => {
 					<Card>
 						<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
 							<CardTitle className="text-sm font-medium">Approved</CardTitle>
-							<CheckCircle className="h-4 w-4 text-green-600" />
+							<CheckCircle className="h-4 w-4 text-success" />
 						</CardHeader>
 						<CardContent>
-							<div className="text-2xl font-bold text-green-600">
+							<div className="text-2xl font-bold text-success">
 								{stats.approved}
 							</div>
 							<p className="text-xs text-muted-foreground">
@@ -380,10 +379,10 @@ const Dashboard = memo(() => {
 							<CardTitle className="text-sm font-medium">
 								Pending Review
 							</CardTitle>
-							<AlertCircle className="h-4 w-4 text-yellow-600" />
+							<AlertCircle className="h-4 w-4 text-warning" />
 						</CardHeader>
 						<CardContent>
-							<div className="text-2xl font-bold text-yellow-600">
+							<div className="text-2xl font-bold text-warning">
 								{stats.pending}
 							</div>
 							<p className="text-xs text-muted-foreground">Awaiting decision</p>
@@ -395,10 +394,10 @@ const Dashboard = memo(() => {
 							<CardTitle className="text-sm font-medium">
 								Rejected / Flagged
 							</CardTitle>
-							<XCircle className="h-4 w-4 text-red-600" />
+							<XCircle className="h-4 w-4 text-error" />
 						</CardHeader>
 						<CardContent>
-							<div className="text-2xl font-bold text-red-600">
+							<div className="text-2xl font-bold text-error">
 								{stats.rejected + stats.flagged}
 							</div>
 							<p className="text-xs text-muted-foreground">
@@ -467,7 +466,7 @@ const Dashboard = memo(() => {
 											cx="50%"
 											cy="50%"
 											outerRadius={100}
-											fill="#8884d8"
+											fill={COLORS.approved}
 											dataKey="value"
 											label={({ name, percent }) =>
 												`${name} ${(percent * 100).toFixed(0)}%`
@@ -512,7 +511,7 @@ const Dashboard = memo(() => {
 										<Line
 											type="monotone"
 											dataKey="count"
-											stroke="#3b82f6"
+											stroke={COLORS.country}
 											activeDot={{ r: 8 }}
 										/>
 									</LineChart>

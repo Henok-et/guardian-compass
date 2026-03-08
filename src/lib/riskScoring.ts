@@ -440,13 +440,13 @@ export function getRiskBadgeColor(
 ): string {
 	switch (level) {
 		case "low":
-			return "bg-green-100 text-green-800 border-green-200";
+			return "bg-success/10 text-success border border-success";
 		case "medium":
-			return "bg-yellow-100 text-yellow-800 border-yellow-200";
+			return "bg-warning/10 text-warning border border-warning";
 		case "high":
-			return "bg-red-100 text-red-800 border-red-200";
+			return "bg-error/10 text-error border border-error";
 		case "critical":
-			return "bg-red-900 text-white border-red-900";
+			return "bg-error text-white border border-error";
 	}
 }
 

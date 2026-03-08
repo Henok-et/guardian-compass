@@ -7,13 +7,14 @@ createRoot(document.getElementById("root")!).render(
 	<>
 		<App />
 		<Toaster
-			position="top-center" // or "top-right", "bottom-center", etc.
+			position="top-center"
 			toastOptions={{
 				duration: 5000, // 5 seconds default
 				style: {
 					borderRadius: "8px",
-					background: "#333",
-					color: "#fff",
+					background: "hsl(var(--card))",
+					color: "hsl(var(--card-foreground))",
+					border: "1px solid rgba(var(--border), 0.5)",
 				},
 			}}
 		/>

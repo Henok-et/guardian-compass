@@ -7,99 +7,211 @@ All colors MUST be HSL.
 */
 
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+	:root {
+		/* Light mode theme (AU WGYD look) */
+		--background: 0 0% 98%; /* nearly white */
+		--foreground: 0 0% 12%; /* dark grey / almost black */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+		--card: 0 0% 100%; /* #FFFFFF */
+		--card-foreground: 0 0% 12%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+		--popover: 0 0% 100%;
+		--popover-foreground: 0 0% 12%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+		--primary: 158 100% 24%; /* #007A3D */
+		--primary-rgb: 0, 122, 61;
+		--primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+		--secondary: 0 0% 94%; /* light gray */
+		--secondary-foreground: 0 0% 53%; /* medium gray */
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+		--muted: 0 0% 94%;
+		--muted-foreground: 0 0% 60%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+		--accent: 158 100% 24%; /* same as primary */
+		--accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+		--success: 134 61% 43%; /* #22C55E */
+		--warning: 158 100% 40%; /* green warning (AU primary) */
+		--error: 0 84% 55%; /* #EF4444 */
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+		--border: 210 16% 92%; /* #E5E7EB */
+		--input: 210 16% 92%;
+		--ring: 158 100% 24%;
 
-    --radius: 0.5rem;
+		--radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
+		--sidebar-background: 0 0% 98%;
+		--sidebar-foreground: 222 20% 20%;
+		--sidebar-primary: 158 100% 24%;
+		--sidebar-primary-foreground: 0 0% 100%;
+		--sidebar-accent: 210 16% 92%;
+		--sidebar-accent-foreground: 215 12% 48%;
+		--sidebar-border: 210 16% 92%;
+		--sidebar-ring: 158 100% 24%;
+	}
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+	.dark {
+		/* Dark mode theme */
+		--background: 0 0% 10%; /* very dark gray */
+		--foreground: 0 0% 96%; /* near white */
 
-    --sidebar-primary: 240 5.9% 10%;
+		--card: 0 0% 18%; /* dark card */
+		--card-foreground: 0 0% 96%;
 
-    --sidebar-primary-foreground: 0 0% 98%;
+		--popover: 0 0% 18%;
+		--popover-foreground: 0 0% 96%;
 
-    --sidebar-accent: 240 4.8% 95.9%;
+		--primary: 166 100% 42%; /* #00A86B */
+		--primary-foreground: 0 0% 100%;
 
-    --sidebar-accent-foreground: 240 5.9% 10%;
+		--secondary: 0 0% 18%; /* dark gray */
+		--secondary-foreground: 0 0% 78%; /* light gray */
 
-    --sidebar-border: 220 13% 91%;
+		--muted: 0 0% 18%;
+		--muted-foreground: 0 0% 70%;
 
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
+		--accent: 166 100% 42%; /* #00A86B */
+		--accent-foreground: 0 0% 100%;
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+		--warning: 166 100% 42%; /* green warning (matches primary) */
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+		--destructive: 0 76% 70%; /* #F87171 */
+		--destructive-foreground: 0 0% 100%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+		--border: 0 0% 35%; /* dark gray border */
+		--input: 0 0% 18%;
+		--ring: 166 100% 42%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
+		--sidebar-background: 216 29% 22%;
+		--sidebar-foreground: 210 25% 78%;
+		--sidebar-primary: 166 100% 42%;
+		--sidebar-primary-foreground: 0 0% 100%;
+		--sidebar-accent: 215 30% 27%;
+		--sidebar-accent-foreground: 210 25% 78%;
+		--sidebar-border: 215 30% 27%;
+		--sidebar-ring: 166 100% 42%;
+	}
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+	:root {
+		--transition-fast: 150ms;
+		--transition-medium: 250ms;
+	}
 
-  body {
-    @apply bg-background text-foreground;
-  }
+	.dark {
+		--transition-fast: 150ms;
+		--transition-medium: 250ms;
+	}
+
+	/* Global theme transition (smooth theme switching) */
+	body,
+	button,
+	input,
+	select,
+	textarea,
+	table,
+	th,
+	td,
+	.card,
+	.btn,
+	.button,
+	.sidebar,
+	.popover,
+	.dialog,
+	.toast {
+		transition:
+			background-color var(--transition-medium) ease,
+			color var(--transition-medium) ease,
+			border-color var(--transition-medium) ease,
+			box-shadow var(--transition-medium) ease;
+	}
+
+	/* Ensure components not using the theme variables still follow theme colors */
+	.card,
+	.bg-card {
+		background-color: hsl(var(--card)) !important;
+		color: hsl(var(--card-foreground)) !important;
+	}
+
+	.bg-background {
+		background-color: hsl(var(--background)) !important;
+	}
+
+	.text-foreground {
+		color: hsl(var(--foreground)) !important;
+	}
+
+	/* Provide a simple theme-aware helper class for custom components */
+	.theme-aware {
+		background-color: hsl(var(--card));
+		color: hsl(var(--card-foreground));
+		border-color: hsl(var(--border));
+	}
+
+	/* Helper theme-aware utilities for custom classes */
+	.bg-success {
+		background-color: hsl(var(--success));
+	}
+
+	.text-success {
+		color: hsl(var(--success));
+	}
+
+	.border-success {
+		border-color: hsl(var(--success));
+	}
+
+	.bg-warning {
+		background-color: hsl(var(--warning));
+	}
+
+	.text-warning {
+		color: hsl(var(--warning));
+	}
+
+	.border-warning {
+		border-color: hsl(var(--warning));
+	}
+
+	.bg-error {
+		background-color: hsl(var(--error));
+	}
+
+	.text-error {
+		color: hsl(var(--error));
+	}
+
+	.border-error {
+		border-color: hsl(var(--error));
+	}
+
+	* {
+		@apply border-border;
+	}
+
+	body {
+		@apply bg-background text-foreground;
+	}
+
+	a {
+		color: hsl(var(--primary));
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+
+	a:visited {
+		color: hsl(var(--primary));
+	}
+
+	a:hover,
+	a:focus-visible {
+		color: hsl(var(--primary-foreground));
+	}
+
+	a:focus-visible {
+		outline: 2px solid hsl(var(--primary));
+		outline-offset: 2px;
+	}
 }

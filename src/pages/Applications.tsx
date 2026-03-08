@@ -146,12 +146,12 @@ const Applications = () => {
 										<Badge
 											className={`mt-2 ${
 												app.status === "pending"
-													? "bg-blue-100 text-blue-800"
+													? "bg-primary/10 text-primary"
 													: app.status === "approved"
-														? "bg-green-100 text-green-800"
+														? "bg-success/10 text-success"
 														: app.status === "flagged"
-															? "bg-yellow-100 text-yellow-800"
-															: "bg-red-100 text-red-800"
+															? "bg-warning/10 text-warning"
+															: "bg-error/10 text-error"
 											}`}
 										>
 											{app.status.toUpperCase()}
@@ -171,12 +171,12 @@ const Applications = () => {
 										<Badge
 											className={`text-xs py-1 px-2 absolute top-3 right-3 ${
 												app.riskAssessment.level === "high"
-													? "bg-red-100 text-red-800 border border-red-200"
+													? "bg-error/10 text-error border border-error"
 													: app.riskAssessment.level === "medium"
-														? "bg-yellow-100 text-yellow-800 border border-yellow-200"
+														? "bg-warning/10 text-warning border border-warning"
 														: app.riskAssessment.level === "critical"
-															? "bg-red-900 text-white border border-red-900"
-															: "bg-green-100 text-green-800 border border-green-200"
+															? "bg-error text-white border border-error"
+															: "bg-success/10 text-success border border-success"
 											}`}
 										>
 											{app.riskAssessment.level.toUpperCase()}

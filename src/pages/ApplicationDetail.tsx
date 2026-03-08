@@ -175,9 +175,9 @@ const ApplicationDetail = () => {
 					{
 						icon: "⚠️",
 						style: {
-							border: "1px solid #fbbf24",
-							background: "#fef3c7",
-							color: "#92400e",
+							border: "1px solid hsl(var(--warning))",
+							background: "hsl(var(--warning) / 0.15)",
+							color: "hsl(var(--foreground))",
 						},
 						duration: 10000,
 						position: "top-center",
@@ -616,14 +616,14 @@ const ApplicationDetail = () => {
 						</div>
 
 						{duplicateInfo?.isDuplicate && (
-							<div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+							<div className="bg-warning/10 border border-warning rounded-lg p-4 mb-6">
 								<div className="flex items-start gap-3">
-									<AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+									<AlertCircle className="w-5 h-5 text-warning mt-0.5 flex-shrink-0" />
 									<div>
-										<p className="font-medium text-amber-800">
+										<p className="font-medium text-warning">
 											Potential Duplicate Detected
 										</p>
-										<p className="text-sm text-amber-700 mt-1">
+										<p className="text-sm text-warning mt-1">
 											Similar to a previously{" "}
 											{duplicateInfo.previousStatus?.toUpperCase()} application
 											on{" "}
@@ -635,11 +635,11 @@ const ApplicationDetail = () => {
 											.
 										</p>
 										{duplicateInfo.reason && (
-											<p className="text-sm text-amber-700 mt-1">
+											<p className="text-sm text-warning mt-1">
 												{duplicateInfo.reason}
 											</p>
 										)}
-										<p className="text-sm text-amber-700 mt-2">
+										<p className="text-sm text-warning mt-2">
 											Please review carefully before taking action.
 										</p>
 									</div>
@@ -778,7 +778,7 @@ const ApplicationDetail = () => {
 														transition={{ delay: index * 0.08 }}
 														className={`border rounded-lg p-5 bg-muted/30 space-y-2 shadow-sm ${
 															leader.isFinalDecisionMaker
-																? "border-blue-500 bg-blue-50/70"
+																? "border-primary bg-primary/10"
 																: ""
 														}`}
 													>
@@ -787,7 +787,7 @@ const ApplicationDetail = () => {
 																{leader.name}
 															</p>
 															{leader.isFinalDecisionMaker && (
-																<span className="text-sm text-blue-700 font-medium bg-blue-100 px-2.5 py-1 rounded-full">
+																<span className="text-sm text-primary font-medium bg-primary/10 px-2.5 py-1 rounded-full">
 																	Final Decision Maker
 																</span>
 															)}
@@ -897,7 +897,7 @@ const ApplicationDetail = () => {
 																typeof val === "number" && val > 0;
 															const colorClass = positive
 																? key === "missingId"
-																	? "text-yellow-600 font-medium"
+																	? "text-warning font-medium"
 																	: "text-destructive font-medium"
 																: "";
 															return (
@@ -980,13 +980,13 @@ const ApplicationDetail = () => {
 															<span className="font-medium text-muted-foreground">
 																Scanning UN Sanctions Databases...
 															</span>
-															<span className="font-semibold text-blue-600">
+															<span className="font-semibold text-primary">
 																{Math.round(progress)}%
 															</span>
 														</div>
 														<div className="h-2 bg-gray-200 rounded-full overflow-hidden">
 															<motion.div
-																className="h-full bg-blue-600 rounded-full"
+																className="h-full bg-primary rounded-full"
 																initial={{ width: "0%" }}
 																animate={{ width: `${progress}%` }}
 																transition={{ type: "tween", duration: 0.1 }}
@@ -1225,10 +1225,10 @@ const ApplicationDetail = () => {
 												<Badge
 													className={
 														application.status === "approved"
-															? "bg-green-100 text-green-800"
+															? "bg-success/10 text-success"
 															: application.status === "flagged"
-																? "bg-yellow-100 text-yellow-800"
-																: "bg-red-100 text-red-800"
+																? "bg-warning/10 text-warning"
+																: "bg-error/10 text-error"
 													}
 												>
 													{application.status.toUpperCase()}

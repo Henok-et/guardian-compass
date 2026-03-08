@@ -5,22 +5,22 @@ export function calculateStatusData(applications: ApplicationWithRisk[]) {
 		{
 			name: "Approved",
 			value: applications.filter((app) => app.status === "approved").length,
-			color: "#22c55e",
+			color: "var(--success)",
 		},
 		{
 			name: "Pending",
 			value: applications.filter((app) => app.status === "pending").length,
-			color: "#eab308",
+			color: "var(--warning)",
 		},
 		{
 			name: "Rejected",
 			value: applications.filter((app) => app.status === "rejected").length,
-			color: "#ef4444",
+			color: "var(--error)",
 		},
 		{
 			name: "Flagged",
 			value: applications.filter((app) => app.status === "flagged").length,
-			color: "#f97316",
+			color: "var(--warning)",
 		},
 	].filter((item) => item.value > 0);
 }

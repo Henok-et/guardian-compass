@@ -109,8 +109,8 @@ const FlaggedApplications = () => {
 						key={app.id}
 						className={`hover:border-primary/50 transition-colors ${
 							type === "flagged"
-								? "border-l-4 border-l-yellow-500"
-								: "border-l-4 border-l-red-500"
+								? "border-l-4 border-warning"
+								: "border-l-4 border-error"
 						}`}
 					>
 						<CardContent className="pt-6">
@@ -133,13 +133,13 @@ const FlaggedApplications = () => {
 												{new Date(app.submittedAt).toLocaleDateString()}
 											</p>
 											{app.actionDate && type === "flagged" && (
-												<p className="text-sm text-yellow-600 mt-1">
+												<p className="text-sm text-warning mt-1">
 													⚠️ Flagged on{" "}
 													{new Date(app.actionDate).toLocaleDateString()}
 												</p>
 											)}
 											{app.actionDate && type === "rejected" && (
-												<p className="text-sm text-red-600 mt-1">
+												<p className="text-sm text-error mt-1">
 													❌ Rejected on{" "}
 													{new Date(app.actionDate).toLocaleDateString()}
 												</p>
@@ -168,8 +168,8 @@ const FlaggedApplications = () => {
 										<div
 											className={`mt-2 p-2 rounded text-sm ${
 												type === "flagged"
-													? "bg-yellow-50 text-yellow-700"
-													: "bg-red-50 text-red-700"
+													? "bg-warning/10 text-warning"
+													: "bg-error/10 text-error"
 											}`}
 										>
 											<span className="font-medium">Note: </span>
@@ -181,8 +181,8 @@ const FlaggedApplications = () => {
 									<Badge
 										className={
 											type === "flagged"
-												? "bg-yellow-100 text-yellow-800 border-yellow-200"
-												: "bg-red-100 text-red-800 border-red-200"
+												? "bg-warning/10 text-warning border-warning"
+												: "bg-error/10 text-error border-error"
 										}
 									>
 										{type === "flagged" ? "FLAGGED" : "REJECTED"}
