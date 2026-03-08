@@ -1,96 +1,126 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuthContext } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shield, AlertCircle } from 'lucide-react';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuthContext } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
+import { Shield, AlertCircle } from "lucide-react";
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuthContext();
-  const navigate = useNavigate();
+	const [email, setEmail] = useState("");
+	const [password, setPassword] = useState("");
+	const [error, setError] = useState("");
+	const [isLoading, setIsLoading] = useState(false);
+	const { login } = useAuthContext();
+	const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsLoading(true);
+	const handleSubmit = async (e: React.FormEvent) => {
+		e.preventDefault();
+		setError("");
+		setIsLoading(true);
 
-    const success = await login(email, password);
-    setIsLoading(false);
+		const success = await login(email, password);
+		setIsLoading(false);
 
-    if (success) {
-      navigate('/dashboard');
-    } else {
-      setError('Invalid email or password');
-    }
-  };
+		if (success) {
+			navigate("/dashboard");
+		} else {
+			setError("Invalid email or password");
+		}
+	};
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/10 p-4">
-      <Card className="w-full max-w-md shadow-2xl border-primary/20">
-        <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-16 h-16 bg-primary rounded-full flex items-center justify-center">
-            <Shield className="w-8 h-8 text-primary-foreground" />
-          </div>
-          <div>
-            <CardTitle className="text-2xl font-bold">AU Youth Verification</CardTitle>
-            <CardDescription className="mt-2">
-              Due-Diligence System for Youth Organizations
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
-                <AlertCircle className="w-4 h-4" />
-                {error}
-              </div>
-            )}
+	return (
+		<div className="min-h-screen flex flex-col justify-center items-center bg-gradient-to-br from-[hsl(var(--primary)/0.35)] via-[hsl(var(--primary)/0.2)] to-[hsl(var(--background)/0.85)] px-4 py-10">
+			<div className="w-full max-w-6xl">
+				<div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+					<div className="relative overflow-hidden rounded-[12px] border border-border bg-card shadow-lg min-h-[420px]">
+						<img
+							src="/LoginImage.png"
+							alt="AU youth organizations illustration"
+							className="h-full w-full object-cover"
+						/>
+						<div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent" />
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="officer@au.int"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
+						<div className="absolute inset-0 flex items-start justify-start p-6">
+							<div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/90 shadow-lg">
+								<Shield className="h-6 w-6 text-primary-foreground" />
+								<span className="sr-only">AU Youth Verification</span>
+							</div>
+						</div>
+					</div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
+					<Card className="rounded-[12px] border border-border bg-card shadow-lg">
+						<CardHeader className="text-center px-8 pt-10">
+							<CardTitle className="text-xl font-semibold text-foreground">
+								Sign in to your account
+							</CardTitle>
+							<CardDescription className="mt-2 text-sm text-muted-foreground">
+								Enter your AU credentials to continue.
+							</CardDescription>
+						</CardHeader>
+						<CardContent className="px-8 pb-10">
+							<form onSubmit={handleSubmit} className="space-y-5">
+								{error && (
+									<div className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+										<AlertCircle className="w-4 h-4" />
+										{error}
+									</div>
+								)}
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign In'}
-            </Button>
+								<div className="space-y-2">
+									<Label htmlFor="email">Email</Label>
+									<Input
+										id="email"
+										type="email"
+										placeholder="officer@au.int"
+										value={email}
+										onChange={(e) => setEmail(e.target.value)}
+										required
+									/>
+								</div>
 
-            <div className="mt-4 p-4 bg-muted rounded-lg text-sm">
-              <p className="font-medium mb-2">Demo Credentials:</p>
-              <p className="text-muted-foreground">Email: admin@au.int</p>
-              <p className="text-muted-foreground">Password: admin123</p>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
-  );
+								<div className="space-y-2">
+									<Label htmlFor="password">Password</Label>
+									<Input
+										id="password"
+										type="password"
+										placeholder="Enter your password"
+										value={password}
+										onChange={(e) => setPassword(e.target.value)}
+										required
+									/>
+								</div>
+
+								<Button type="submit" className="w-full" disabled={isLoading}>
+									{isLoading ? "Signing in..." : "Sign in"}
+								</Button>
+
+								<div className="rounded-lg border border-border bg-muted p-4 text-sm">
+									<p className="font-medium text-muted-foreground mb-1">
+										Demo Credentials
+									</p>
+									<p className="text-muted-foreground">Email: admin@au.int</p>
+									<p className="text-muted-foreground">Password: admin123</p>
+								</div>
+							</form>
+						</CardContent>
+					</Card>
+				</div>
+
+				<footer className="mt-10 text-center text-xs text-muted-foreground">
+					<p>© African Union – Women, Gender &amp; Youth Directorate</p>
+					<p>Secure Internal Platform</p>
+				</footer>
+			</div>
+		</div>
+	);
 };
 
 export default Login;
