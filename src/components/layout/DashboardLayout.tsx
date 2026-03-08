@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import {
 	LogOut,
 	Shield,
 	User,
+	Moon,
+	Sun,
 } from "lucide-react";
 
 interface DashboardLayoutProps {
@@ -28,6 +30,24 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 	const location = useLocation();
 	const navigate = useNavigate();
 	const { user, logout } = useAuthContext();
+	const [isDark, setIsDark] = useState(false);
+
+	useEffect(() => {
+		const saved = localStorage.getItem("theme");
+		const prefersDark = window.matchMedia(
+			"(prefers-color-scheme: dark)",
+		).matches;
+		const initialDark = saved === "dark" || (!saved && prefersDark);
+		setIsDark(initialDark);
+		document.documentElement.classList.toggle("dark", initialDark);
+	}, []);
+
+	const toggleTheme = () => {
+		const newDark = !isDark;
+		setIsDark(newDark);
+		localStorage.setItem("theme", newDark ? "dark" : "light");
+		document.documentElement.classList.toggle("dark", newDark);
+	};
 
 	const handleLogout = () => {
 		logout();
@@ -72,12 +92,19 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 						})}
 					</nav>
 					<div className="flex items-center gap-4">
+						<Button variant="ghost" size="icon" onClick={toggleTheme}>
+							{isDark ? (
+								<Sun className="h-4 w-4" />
+							) : (
+								<Moon className="h-4 w-4" />
+							)}
+						</Button>
 						{user ? (
 							<div className="flex items-center gap-3">
 								<div className="hidden sm:flex items-center gap-2 text-sm">
 									<User className="w-4 h-4 text-muted-foreground" />
 									<div className="flex items-center gap-2">
-										<span className="text-muted-foreground">{user.name}</span>
+										
 										<span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
 											{user.role?.toUpperCase()}
 										</span>

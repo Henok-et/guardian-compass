@@ -25,6 +25,7 @@ export interface BaseApplication {
 	}>;
 	status: "pending" | "approved" | "rejected" | "flagged";
 	submittedAt: string;
+	actionDate?: string;
 }
 
 // Application from API (with computed risk)

@@ -10,6 +10,11 @@ import type {
 	TrackedApplication,
 } from "@/types/application";
 
+// Cache so switching between tabs doesn't refetch every time.
+// This keeps the app snappy by reusing the last loaded data.
+let cachedApplications: ApplicationWithRisk[] | null = null;
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // helper moved out of the hook so callbacks can reference it without having to
 // add it to every dependency list. returning `string | null` matches the
 // original behaviour.
@@ -37,15 +42,32 @@ export function useApplications() {
 		setIsLoading(true);
 		setError(null);
 
-		try {
-			// Fetch from backend
-			const response = await fetch("/api/applications");
+		// If we already have cached data, use it and avoid refetching.
+		// This makes tab switching fast and avoids redundant network requests.
+		if (cachedApplications) {
+			setAllApplications(cachedApplications);
+			setApplications(cachedApplications.filter((a) => a.status === "pending"));
+			setIsLoading(false);
+			return;
+		}
 
-			if (!response.ok) {
-				throw new Error(`HTTP error! status: ${response.status}`);
+		try {
+			// Fetch from backend in parallel
+			const [appsResp, wfResp] = await Promise.all([
+				fetch("/api/applications"),
+				fetch("/api/workflow").catch(() => ({
+					ok: false,
+					json: () => ({
+						workflow: { verified: [], flagged: [], rejected: [] },
+					}),
+				})),
+			]);
+
+			if (!appsResp.ok) {
+				throw new Error(`HTTP error! status: ${appsResp.status}`);
 			}
 
-			const rawApps: ApplicationData[] = await response.json();
+			const rawApps: ApplicationData[] = await appsResp.json();
 
 			// Calculate risk for each
 			const appsWithRisk: ApplicationWithRisk[] = await Promise.all(
@@ -61,7 +83,6 @@ export function useApplications() {
 			// Fetch persisted workflow state from backend/Mongo
 			let workflow: any = { verified: [], flagged: [], rejected: [] };
 			try {
-				const wfResp = await fetch("/api/workflow");
 				if (wfResp.ok) {
 					const wfJson = await wfResp.json();
 					workflow = wfJson.workflow || workflow;
@@ -105,6 +126,9 @@ export function useApplications() {
 			applyPersisted(workflow.rejected, "rejected");
 
 			const updatedApps = appsWithRisk;
+
+			// Cache for fast tab switching; keeps data available between mounts.
+			cachedApplications = updatedApps;
 
 			// Store ALL applications and keep derived lists in sync
 			setAllApplications(updatedApps);
@@ -151,6 +175,7 @@ export function useApplications() {
 						token ? { Authorization: `Bearer ${token}` } : {},
 					),
 				});
+				cachedApplications = null;
 				await loadData();
 			} catch (e) {
 				console.warn("Failed to persist approve to server:", e);
@@ -170,6 +195,7 @@ export function useApplications() {
 						token ? { Authorization: `Bearer ${token}` } : {},
 					),
 				});
+				cachedApplications = null;
 				await loadData();
 			} catch (e) {
 				console.warn("Failed to persist reject to server:", e);
@@ -189,6 +215,7 @@ export function useApplications() {
 						token ? { Authorization: `Bearer ${token}` } : {},
 					),
 				});
+				cachedApplications = null;
 				await loadData();
 			} catch (e) {
 				console.warn("Failed to persist flag to server:", e);

@@ -1,9 +1,11 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, memo } from "react";
 import { Link } from "react-router-dom";
 import { useApplications } from "@/hooks/useApplications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Select,
 	SelectContent,
@@ -35,7 +37,17 @@ import {
 	CheckCircle,
 	XCircle,
 	AlertCircle,
+	Search,
+	Download,
 } from "lucide-react";
+import {
+	calculateStatusData,
+	calculateCountryData,
+	calculateTimelineData,
+	filterApplications,
+	getRecentApplications,
+	getAvailableCountries,
+} from "@/lib/dashboardUtils";
 
 // African countries list (unchanged)
 const AFRICAN_COUNTRIES = [
@@ -103,12 +115,13 @@ const COLORS = {
 	country: "#3b82f6",
 };
 
-const Dashboard = () => {
+const Dashboard = memo(() => {
 	// the hook returns both the full list (named `applications`) and a
 	// statistics object; rename the list here so it's obvious this is the
 	// complete dataset used for charts/filters.
 	const { applications: allApplications, isLoading, stats } = useApplications();
 	const [selectedCountry, setSelectedCountry] = useState<string>("all");
+	const [searchQuery, setSearchQuery] = useState<string>("");
 
 	// We now rely on stats returned by the hook, which already combines
 	// pending/all/flagged/rejected and is kept in sync with localStorage.
@@ -126,68 +139,142 @@ const Dashboard = () => {
 	}, [stats]);
 
 	// Data for country bar chart
-	const countryData = useMemo(() => {
-		const countryMap = new Map<string, number>();
-		allApplications.forEach((app) => {
-			if (app.country) {
-				const count = countryMap.get(app.country) || 0;
-				countryMap.set(app.country, count + 1);
-			}
-		});
-		// Convert to array, sort by count descending, take top 10
-		return Array.from(countryMap.entries())
-			.map(([country, count]) => ({ country, count }))
-			.sort((a, b) => b.count - a.count)
-			.slice(0, 10);
-	}, [allApplications]);
+	const countryData = useMemo(
+		() => calculateCountryData(allApplications),
+		[allApplications],
+	);
 
 	// Data for line chart (registrations over time)
-	const timelineData = useMemo(() => {
-		const months: { [key: string]: number } = {};
-		allApplications.forEach((app) => {
-			const date = new Date(app.submittedAt);
-			const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-			months[monthKey] = (months[monthKey] || 0) + 1;
-		});
-		return Object.entries(months)
-			.map(([month, count]) => ({ month, count }))
-			.sort((a, b) => a.month.localeCompare(b.month))
-			.slice(-12); // last 12 months
-	}, [allApplications]);
+	const timelineData = useMemo(
+		() => calculateTimelineData(allApplications),
+		[allApplications],
+	);
 
 	// Filtered applications for recent list
-	const filteredApplications = useMemo(() => {
-		if (selectedCountry === "all") return allApplications;
-		return allApplications.filter((app) => app.country === selectedCountry);
-	}, [allApplications, selectedCountry]);
+	const filteredApplications = useMemo(
+		() =>
+			filterApplications(
+				allApplications,
+				selectedCountry,
+				searchQuery,
+				AFRICAN_COUNTRIES,
+			),
+		[allApplications, selectedCountry, searchQuery],
+	);
 
 	// Recent applications (last 5)
-	const recentApplications = useMemo(() => {
-		return [...filteredApplications]
-			.sort(
-				(a, b) =>
-					new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
-			)
-			.slice(0, 5);
-	}, [filteredApplications]);
+	const recentApplications = useMemo(
+		() => getRecentApplications(filteredApplications),
+		[filteredApplications],
+	);
 
 	// Unique African countries in data
-	const availableCountries = useMemo(() => {
-		const countries = new Set(
-			allApplications.map((app) => app.country).filter(Boolean),
+	const availableCountries = useMemo(
+		() => getAvailableCountries(allApplications, AFRICAN_COUNTRIES),
+		[allApplications],
+	);
+
+	// Export to CSV
+	const exportToCSV = () => {
+		const headers = [
+			"Organization Name",
+			"Email",
+			"Country",
+			"Registration Number",
+			"Status",
+			"Submitted At",
+		];
+		const rows = filteredApplications.map((app) => [
+			app.organizationName || "",
+			app.email || "",
+			app.country || "",
+			app.registrationNumber || "",
+			app.status || "",
+			app.submittedAt || "",
+		]);
+		const csvContent = [headers, ...rows]
+			.map((row) => row.map((cell) => `"${cell}"`).join(","))
+			.join("\n");
+		const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+		const link = document.createElement("a");
+		const url = URL.createObjectURL(blob);
+		link.setAttribute("href", url);
+		link.setAttribute(
+			"download",
+			`applications_${new Date().toISOString().split("T")[0]}.csv`,
 		);
-		return Array.from(countries)
-			.filter((c) =>
-				AFRICAN_COUNTRIES.some((ac) => ac.toLowerCase() === c.toLowerCase()),
-			)
-			.sort();
-	}, [allApplications]);
+		link.style.visibility = "hidden";
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+	};
 
 	if (isLoading) {
 		return (
 			<DashboardLayout>
-				<div className="flex items-center justify-center h-64">
-					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+				<div className="space-y-8">
+					{/* Header Skeleton */}
+					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+						<div className="flex flex-col sm:flex-row gap-4">
+							<Skeleton className="h-10 w-80" />
+							<Skeleton className="h-10 w-48" />
+						</div>
+					</div>
+					{/* Stats Cards Skeleton */}
+					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+						{Array.from({ length: 4 }).map((_, i) => (
+							<Card key={i}>
+								<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+									<Skeleton className="h-4 w-24" />
+									<Skeleton className="h-4 w-4" />
+								</CardHeader>
+								<CardContent>
+									<Skeleton className="h-8 w-16 mb-1" />
+									<Skeleton className="h-3 w-32" />
+								</CardContent>
+							</Card>
+						))}
+					</div>
+					{/* Charts Skeleton */}
+					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+						<Card className="col-span-4">
+							<CardHeader>
+								<Skeleton className="h-6 w-32" />
+							</CardHeader>
+							<CardContent className="pl-2">
+								<Skeleton className="h-64 w-full" />
+							</CardContent>
+						</Card>
+						<Card className="col-span-3">
+							<CardHeader>
+								<Skeleton className="h-6 w-24" />
+								<Skeleton className="h-4 w-40" />
+							</CardHeader>
+							<CardContent>
+								<Skeleton className="h-64 w-full" />
+							</CardContent>
+						</Card>
+					</div>
+					{/* Recent Apps Skeleton */}
+					<Card>
+						<CardHeader>
+							<Skeleton className="h-6 w-40" />
+						</CardHeader>
+						<CardContent>
+							<div className="space-y-4">
+								{Array.from({ length: 5 }).map((_, i) => (
+									<div key={i} className="flex items-center space-x-4">
+										<Skeleton className="h-12 w-12 rounded-full" />
+										<div className="space-y-2 flex-1">
+											<Skeleton className="h-4 w-48" />
+											<Skeleton className="h-3 w-32" />
+										</div>
+										<Skeleton className="h-6 w-16" />
+									</div>
+								))}
+							</div>
+						</CardContent>
+					</Card>
 				</div>
 			</DashboardLayout>
 		);
@@ -195,10 +282,34 @@ const Dashboard = () => {
 
 	return (
 		<DashboardLayout>
-			<div className="space-y-8">
+			<div className="space-y-8" role="main">
 				{/* Header + Country Filter */}
 				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-					<div>
+					<div className="flex flex-col sm:flex-row gap-4">
+						<div className="relative">
+							<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+							<Input
+								placeholder="Search organizations, emails, countries..."
+								value={searchQuery}
+								onChange={(e) => setSearchQuery(e.target.value)}
+								className="pl-10 w-full sm:w-80"
+							/>
+						</div>
+						<Select value={selectedCountry} onValueChange={setSelectedCountry}>
+							<SelectTrigger className="w-full sm:w-48">
+								<SelectValue placeholder="Select country" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">All Countries</SelectItem>
+								{availableCountries.map((country) => (
+									<SelectItem key={country} value={country}>
+										{country}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
+					<div className="flex flex-col items-end gap-2">
 						<h1 className="text-3xl font-bold">Registration Dashboard</h1>
 						<p className="text-muted-foreground mt-1">
 							Youth‑Led Organizations Across Africa
@@ -208,6 +319,10 @@ const Dashboard = () => {
 								</span>
 							)}
 						</p>
+						<Button onClick={exportToCSV} variant="outline" size="sm">
+							<Download className="w-4 h-4 mr-2" />
+							Export CSV
+						</Button>
 					</div>
 
 					<Select value={selectedCountry} onValueChange={setSelectedCountry}>
@@ -304,7 +419,11 @@ const Dashboard = () => {
 						</CardHeader>
 						<CardContent>
 							{countryData.length > 0 ? (
-								<ResponsiveContainer width="100%" height={300}>
+								<ResponsiveContainer
+									width="100%"
+									height={300}
+									aria-label="Bar chart showing registrations by country"
+								>
 									<BarChart
 										data={countryData}
 										layout="vertical"
@@ -337,7 +456,11 @@ const Dashboard = () => {
 						</CardHeader>
 						<CardContent>
 							{statusData.length > 0 ? (
-								<ResponsiveContainer width="100%" height={300}>
+								<ResponsiveContainer
+									width="100%"
+									height={300}
+									aria-label="Pie chart showing registration status distribution"
+								>
 									<PieChart>
 										<Pie
 											data={statusData}
@@ -372,7 +495,11 @@ const Dashboard = () => {
 						</CardHeader>
 						<CardContent>
 							{timelineData.length > 0 ? (
-								<ResponsiveContainer width="100%" height={300}>
+								<ResponsiveContainer
+									width="100%"
+									height={300}
+									aria-label="Line chart showing registrations over time"
+								>
 									<LineChart
 										data={timelineData}
 										margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
@@ -464,6 +591,6 @@ const Dashboard = () => {
 			</div>
 		</DashboardLayout>
 	);
-};
+});
 
 export default Dashboard;
