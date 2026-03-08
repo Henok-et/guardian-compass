@@ -377,6 +377,16 @@ app.post("/api/applications/:id/notify", async (req, res) => {
 });
 
 // ──────────────────────────────────────────────────────────────
+// SPA fallback for client-side routing
+// ──────────────────────────────────────────────────────────────
+// For routes like /dashboard, /applications, etc., serve index.html so the
+// React app can handle routing. Do not override API routes.
+app.get("*", (req, res, next) => {
+	if (req.path.startsWith("/api")) return next();
+	res.sendFile(path.join(__dirname, "dist", "index.html"));
+});
+
+// ──────────────────────────────────────────────────────────────
 // Start the server
 // ──────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
