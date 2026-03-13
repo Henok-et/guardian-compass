@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,11 @@ const Login = () => {
 	const { login } = useAuthContext();
 	const navigate = useNavigate();
 
+	const handleInputChange = () => {
+		if (verifiedMessage) setVerifiedMessage("");
+		if (error) setError("");
+	};
+
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setError("");
@@ -30,12 +35,36 @@ const Login = () => {
 		setIsLoading(false);
 
 		if (success) {
-			navigate("/dashboard");
+			// Get user role from localStorage
+			const authData = localStorage.getItem("au_verification_auth");
+			let role = "user";
+			if (authData) {
+				try {
+					const parsed = JSON.parse(authData);
+					role = parsed?.user?.role || "user";
+				} catch {}
+			}
+			if (role === "admin" || role === "officer") {
+				navigate("/dashboard");
+			} else {
+				navigate("/register");
+			}
 		} else {
 			setError("Invalid email or password");
 		}
 	};
+	const location = useLocation();
+	const [verifiedMessage, setVerifiedMessage] = useState("");
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		const verified = params.get("verified");
 
+		if (verified === "true") {
+			setVerifiedMessage("Your email has been verified. You can now log in.");
+		} else if (verified === "false") {
+			setVerifiedMessage("Verification failed or link expired.");
+		}
+	}, [location.search]);
 	return (
 		<div className="min-h-screen flex flex-col justify-center items-center bg-gradient-to-br from-[hsl(var(--primary)/0.35)] via-[hsl(var(--primary)/0.2)] to-[hsl(var(--background)/0.85)] px-4 py-10">
 			<div className="w-full max-w-6xl">
@@ -67,6 +96,11 @@ const Login = () => {
 						</CardHeader>
 						<CardContent className="px-8 pb-10">
 							<form onSubmit={handleSubmit} className="space-y-5">
+								{verifiedMessage && (
+									<div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 p-3 text-sm text-primary">
+										{verifiedMessage}
+									</div>
+								)}
 								{error && (
 									<div className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
 										<AlertCircle className="w-4 h-4" />
@@ -81,7 +115,10 @@ const Login = () => {
 										type="email"
 										placeholder="officer@au.int"
 										value={email}
-										onChange={(e) => setEmail(e.target.value)}
+										onChange={(e) => {
+											setEmail(e.target.value);
+											handleInputChange();
+										}}
 										required
 									/>
 								</div>
@@ -93,7 +130,10 @@ const Login = () => {
 										type="password"
 										placeholder="Enter your password"
 										value={password}
-										onChange={(e) => setPassword(e.target.value)}
+										onChange={(e) => {
+											setPassword(e.target.value);
+											handleInputChange();
+										}}
 										required
 									/>
 								</div>
@@ -108,6 +148,18 @@ const Login = () => {
 									</p>
 									<p className="text-muted-foreground">Email: admin@au.int</p>
 									<p className="text-muted-foreground">Password: admin123</p>
+								</div>
+
+								<div className="mt-4 text-center text-sm">
+									<span className="text-muted-foreground">
+										Don't have an account?
+									</span>
+									<a
+										href="/register"
+										className="ml-2 text-primary underline hover:text-primary-dark"
+									>
+										Register here
+									</a>
 								</div>
 							</form>
 						</CardContent>

@@ -32,19 +32,19 @@ export function useAuth() {
 		async (email: string, password: string): Promise<boolean> => {
 			// Try server login first
 			try {
-				const res = await fetch("/api/login", {
+				const res = await fetch("/api/auth/login", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ username: email, password }),
+					body: JSON.stringify({ email, password }),
 				});
 				if (res.ok) {
 					const data = await res.json();
 					const token = data?.token;
 					const userObj: User = {
-						id: "server-user",
-						email,
-						name: email,
-						role: "admin",
+						id: data?.user?.id || "server-user",
+						email: data?.user?.email || email,
+						name: data?.user?.username || email,
+						role: data?.user?.role || "user",
 					};
 					setUser(userObj);
 					localStorage.setItem(
@@ -84,6 +84,42 @@ export function useAuth() {
 		[],
 	);
 
+	const register = useCallback(
+		async (
+			username: string,
+			email: string,
+			password: string,
+		): Promise<boolean> => {
+			try {
+				const res = await fetch("/api/auth/register", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ username, email, password }),
+				});
+				if (res.ok) {
+					const data = await res.json();
+					const token = data?.token;
+					const userObj: User = {
+						id: data?.user?.id || "server-user",
+						email: data?.user?.email || email,
+						name: data?.user?.username || username,
+						role: data?.user?.role || "user",
+					};
+					setUser(userObj);
+					localStorage.setItem(
+						AUTH_KEY,
+						JSON.stringify({ user: userObj, token }),
+					);
+					return true;
+				}
+			} catch (e) {
+				console.warn("Server registration failed");
+			}
+			return false;
+		},
+		[],
+	);
+
 	const logout = useCallback(() => {
 		setUser(null);
 		localStorage.removeItem(AUTH_KEY);
@@ -94,6 +130,7 @@ export function useAuth() {
 		isLoading,
 		isAuthenticated: !!user,
 		login,
+		register,
 		logout,
 	};
 }

@@ -19,18 +19,30 @@ interface DashboardLayoutProps {
 	children: ReactNode;
 }
 
-const navItems = [
-	{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-	{ href: "/applications", label: "Applications", icon: FileText },
-	{ href: "/verified", label: "Verified", icon: CheckCircle },
-	{ href: "/flagged", label: "Flagged", icon: Flag },
-];
+// Navigation items by role
+const navItemsByRole = {
+	admin: [
+		{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+		{ href: "/applications", label: "Applications", icon: FileText },
+		{ href: "/verified", label: "Verified", icon: CheckCircle },
+		{ href: "/flagged", label: "Flagged", icon: Flag },
+	],
+	officer: [
+		{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+		{ href: "/applications", label: "Applications", icon: FileText },
+		{ href: "/verified", label: "Verified", icon: CheckCircle },
+		{ href: "/flagged", label: "Flagged", icon: Flag },
+	],
+	user: [{ href: "/register", label: "Registration Form", icon: FileText }],
+};
 
 const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 	const location = useLocation();
 	const navigate = useNavigate();
 	const { user, logout } = useAuthContext();
 	const [isDark, setIsDark] = useState(false);
+	const role = user?.role || "user";
+	const navItems = navItemsByRole[role] || navItemsByRole.user;
 
 	useEffect(() => {
 		const saved = localStorage.getItem("theme");
@@ -104,7 +116,6 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 								<div className="hidden sm:flex items-center gap-2 text-sm">
 									<User className="w-4 h-4 text-muted-foreground" />
 									<div className="flex items-center gap-2">
-										
 										<span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
 											{user.role?.toUpperCase()}
 										</span>

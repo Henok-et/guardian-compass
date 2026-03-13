@@ -18,8 +18,8 @@ All colors MUST be HSL.
 		--popover: 0 0% 100%;
 		--popover-foreground: 0 0% 12%;
 
-		--primary: 158 100% 24%; /* #007A3D */
-		--primary-rgb: 0, 122, 61;
+		--primary: 30 100% 50%; /* orange */
+		--primary-rgb: 255, 140, 0;
 		--primary-foreground: 0 0% 100%;
 
 		--secondary: 0 0% 94%; /* light gray */
@@ -28,27 +28,27 @@ All colors MUST be HSL.
 		--muted: 0 0% 94%;
 		--muted-foreground: 0 0% 60%;
 
-		--accent: 158 100% 24%; /* same as primary */
+		--accent: 30 100% 50%; /* orange */
 		--accent-foreground: 0 0% 100%;
 
-		--success: 134 61% 43%; /* #22C55E */
-		--warning: 158 100% 40%; /* green warning (AU primary) */
+		--success: 30 100% 50%; /* orange for success */
+		--warning: 30 100% 50%; /* orange for warning */
 		--error: 0 84% 55%; /* #EF4444 */
 
 		--border: 210 16% 92%; /* #E5E7EB */
 		--input: 210 16% 92%;
-		--ring: 158 100% 24%;
+		--ring: 30 100% 50%;
 
 		--radius: 0.5rem;
 
 		--sidebar-background: 0 0% 98%;
 		--sidebar-foreground: 222 20% 20%;
-		--sidebar-primary: 158 100% 24%;
+		--sidebar-primary: 30 100% 50%;
 		--sidebar-primary-foreground: 0 0% 100%;
 		--sidebar-accent: 210 16% 92%;
 		--sidebar-accent-foreground: 215 12% 48%;
 		--sidebar-border: 210 16% 92%;
-		--sidebar-ring: 158 100% 24%;
+		--sidebar-ring: 30 100% 50%;
 	}
 
 	.dark {
@@ -62,7 +62,7 @@ All colors MUST be HSL.
 		--popover: 0 0% 18%;
 		--popover-foreground: 0 0% 96%;
 
-		--primary: 166 100% 42%; /* #00A86B */
+		--primary: 30 100% 50%; /* orange */
 		--primary-foreground: 0 0% 100%;
 
 		--secondary: 0 0% 18%; /* dark gray */
@@ -71,10 +71,10 @@ All colors MUST be HSL.
 		--muted: 0 0% 18%;
 		--muted-foreground: 0 0% 70%;
 
-		--accent: 166 100% 42%; /* #00A86B */
+		--accent: 30 100% 50%; /* orange */
 		--accent-foreground: 0 0% 100%;
 
-		--warning: 166 100% 42%; /* green warning (matches primary) */
+		--warning: 30 100% 50%; /* orange warning */
 
 		--destructive: 0 76% 70%; /* #F87171 */
 		--destructive-foreground: 0 0% 100%;

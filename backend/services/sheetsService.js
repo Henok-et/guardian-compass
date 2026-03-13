@@ -1,21 +1,41 @@
 import { google } from "googleapis";
-import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-
-dotenv.config();
 
 // Thin service around Google Sheets client initialization and simple read helper.
 let sheetsClient = null;
 
 export async function initializeGoogleSheets() {
 	try {
-		if (!process.env.GOOGLE_CREDENTIALS) {
-			throw new Error("GOOGLE_CREDENTIALS environment variable is missing");
+		let credentialsRaw = process.env.GOOGLE_CREDENTIALS;
+
+		if (!credentialsRaw && process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+			// If a path is provided, load that file.
+			const keyPath = path.resolve(
+				process.cwd(),
+				process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
+			);
+			if (fs.existsSync(keyPath)) {
+				credentialsRaw = fs.readFileSync(keyPath, "utf8");
+			}
 		}
 
-		const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+		if (!credentialsRaw) {
+			throw new Error(
+				"GOOGLE_CREDENTIALS (JSON) or GOOGLE_SERVICE_ACCOUNT_KEY (path) is required",
+			);
+		}
+
+		let credentials;
+		try {
+			credentials = JSON.parse(credentialsRaw);
+		} catch (err) {
+			throw new Error(
+				"Failed to parse GOOGLE_CREDENTIALS JSON: " + err.message,
+			);
+		}
+
 		const auth = new google.auth.JWT({
 			email: credentials.client_email,
 			key: credentials.private_key.replace(/\\n/g, "\n"),
