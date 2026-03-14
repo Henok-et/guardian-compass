@@ -19,22 +19,9 @@ export async function createApplication(data) {
 	const col = await getCollection(COLLECTION);
 	const now = new Date();
 	const record = {
-		userId: data.userId,
-		email: data.email,
-		legalNameOfOrganization: data.legalNameOfOrganization,
-		registrationNumber: data.registrationNumber,
-		countryOfRegistration: data.countryOfRegistration,
-		yearEstablished: data.yearEstablished,
-		officialWebsite: data.officialWebsite,
-		executiveHead: data.executiveHead,
-		boardMembers: data.boardMembers,
-		totalBoardMembers: data.totalBoardMembers,
-		activitiesLast12Months: data.activitiesLast12Months,
-		proofUpload: data.proofUpload,
-		confirmationYouthAgeRange: data.confirmationYouthAgeRange,
-		legalDeclaration: data.legalDeclaration,
+		...data,
 		status: data.status || STATUS_PENDING,
-		riskAssessment: data.riskAssessment || null,
+		submittedAt: data.submittedAt || now,
 		createdAt: now,
 		updatedAt: now,
 	};
@@ -72,6 +59,9 @@ export async function deleteApplication(id) {
 
 export function sanitize(application) {
 	if (!application) return null;
+	// Hide sensitive fields for users
+	// Officers/admins can see all fields; users only see their own non-sensitive fields
+	// (This logic should be enforced in controller, but here is a basic filter)
 	return {
 		...application,
 		id: String(application._id),

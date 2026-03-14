@@ -42,7 +42,10 @@ const Login = () => {
 				try {
 					const parsed = JSON.parse(authData);
 					role = parsed?.user?.role || "user";
-				} catch {}
+				} catch (err) {
+					console.error("Failed to parse auth data", err);
+					role = "user";
+				}
 			}
 			if (role === "admin" || role === "officer") {
 				navigate("/dashboard");

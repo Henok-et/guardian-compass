@@ -4,7 +4,13 @@ interface User {
 	id: string;
 	email: string;
 	name: string;
-	role: "admin" | "officer";
+	role: "admin" | "officer" | "user";
+}
+
+export interface RegisterResult {
+	success: boolean;
+	message?: string;
+	duplicate?: boolean;
 }
 
 const AUTH_KEY = "au_verification_auth";
@@ -12,6 +18,7 @@ const AUTH_KEY = "au_verification_auth";
 export function useAuth() {
 	const [user, setUser] = useState<User | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
+	const [error, setError] = useState<string>("");
 
 	useEffect(() => {
 		try {
@@ -22,7 +29,7 @@ export function useAuth() {
 					setUser(parsed.user as User);
 				}
 			}
-		} catch (e) {
+		} catch {
 			// ignore
 		}
 		setIsLoading(false);
@@ -89,13 +96,14 @@ export function useAuth() {
 			username: string,
 			email: string,
 			password: string,
-		): Promise<boolean> => {
+		): Promise<RegisterResult> => {
 			try {
 				const res = await fetch("/api/auth/register", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({ username, email, password }),
 				});
+
 				if (res.ok) {
 					const data = await res.json();
 					const token = data?.token;
@@ -110,14 +118,32 @@ export function useAuth() {
 						AUTH_KEY,
 						JSON.stringify({ user: userObj, token }),
 					);
-					return true;
+					setError("");
+					return { success: true };
 				}
+
+				if (res.status === 409) {
+					const errorData = await res.json().catch(() => ({}));
+					const msg =
+						errorData.message ||
+						"This email or username is already registered. Please log in instead.";
+					setError(msg);
+					return { success: false, duplicate: true, message: msg };
+				}
+
+				const errorData = await res.json().catch(() => ({}));
+				const msg =
+					errorData.message || "Registration failed. Please try again.";
+				setError(msg);
+				return { success: false, message: msg };
 			} catch (e) {
-				console.warn("Server registration failed");
+				console.error("Registration error:", e);
+				const msg = "Network error. Please check your connection.";
+				setError(msg);
+				return { success: false, message: msg };
 			}
-			return false;
 		},
-		[],
+		[setError],
 	);
 
 	const logout = useCallback(() => {
@@ -129,6 +155,7 @@ export function useAuth() {
 		user,
 		isLoading,
 		isAuthenticated: !!user,
+		error,
 		login,
 		register,
 		logout,

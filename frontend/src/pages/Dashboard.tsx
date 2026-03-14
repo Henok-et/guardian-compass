@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, memo } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
+import { useAuthContext } from "@/contexts/AuthContext";
 import { useApplications } from "@/hooks/useApplications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -117,12 +118,41 @@ const COLORS = {
 };
 
 const Dashboard = memo(() => {
+	const { user } = useAuthContext();
 	// the hook returns both the full list (named `applications`) and a
 	// statistics object; rename the list here so it's obvious this is the
 	// complete dataset used for charts/filters.
 	const { applications: allApplications, isLoading, stats } = useApplications();
+	const [registrationStatus, setRegistrationStatus] = useState<
+		"loading" | "complete" | "incomplete"
+	>("loading");
 	const [selectedCountry, setSelectedCountry] = useState<string>("all");
 	const [searchQuery, setSearchQuery] = useState<string>("");
+
+	useEffect(() => {
+		async function checkRegistration() {
+			if (!user || user.role !== "user") {
+				setRegistrationStatus("complete"); // officers/admins always allowed
+				return;
+			}
+			try {
+				const res = await fetch(`/api/applications?userId=${user.id}`);
+				if (res.ok) {
+					const apps = await res.json();
+					if (apps && apps.length > 0) {
+						setRegistrationStatus("complete");
+					} else {
+						setRegistrationStatus("incomplete");
+					}
+				} else {
+					setRegistrationStatus("incomplete");
+				}
+			} catch {
+				setRegistrationStatus("incomplete");
+			}
+		}
+		checkRegistration();
+	}, [user]);
 
 	// We now rely on stats returned by the hook, which already combines
 	// pending/all/flagged/rejected and is kept in sync with localStorage.
@@ -175,6 +205,16 @@ const Dashboard = memo(() => {
 		[allApplications],
 	);
 
+	if (registrationStatus === "loading") {
+		return (
+			<div className="min-h-screen flex items-center justify-center bg-background">
+				<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+			</div>
+		);
+	}
+	if (registrationStatus === "incomplete") {
+		return <Navigate to="/register" replace />;
+	}
 	// Export to CSV
 	const exportToCSV = () => {
 		const headers = [

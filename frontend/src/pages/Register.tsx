@@ -21,6 +21,7 @@ const Register = () => {
 	const [error, setError] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
 	const [successMsg, setSuccessMsg] = useState("");
+	const [isDuplicate, setIsDuplicate] = useState(false);
 	const { register } = useAuthContext();
 	const navigate = useNavigate();
 
@@ -53,20 +54,25 @@ const Register = () => {
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setError("");
+		setIsDuplicate(false);
 		setIsLoading(true);
 
-		const success = await register(username, email, password);
+		const result = await register(username, email, password);
 		setIsLoading(false);
 
-		if (success) {
+		if (result.success) {
 			setSuccessMsg(
 				"Registration successful. Please check your email to verify your account.",
 			);
 			setTimeout(() => {
-				navigate("/login");
+				navigate("/register");
 			}, 2000);
-		} else {
-			setError("Registration failed. Please try again.");
+			return;
+		}
+
+		setError(result.message || "Registration failed. Please try again.");
+		if (result.duplicate) {
+			setIsDuplicate(true);
 		}
 	};
 
@@ -106,10 +112,21 @@ const Register = () => {
 						</CardHeader>
 						<CardContent className="px-8 pb-10">
 							<form onSubmit={handleSubmit} className="space-y-5">
-								{error && (
-									<div className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-										<AlertCircle className="w-4 h-4" />
-										{error}
+								{(error || isDuplicate) && (
+									<div className="flex flex-col gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+										<div className="flex items-center gap-2">
+											<AlertCircle className="w-4 h-4" />
+											{error || "This account is already registered."}
+										</div>
+										{isDuplicate && (
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={() => navigate("/login")}
+											>
+												Already registered? Log in
+											</Button>
+										)}
 									</div>
 								)}
 

@@ -1,23 +1,25 @@
 import React, { createContext, useContext, ReactNode } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import type { RegisterResult } from "@/hooks/useAuth";
 
 interface User {
 	id: string;
 	email: string;
 	name: string;
-	role: "admin" | "officer";
+	role: "admin" | "officer" | "user";
 }
 
 interface AuthContextType {
 	user: User | null;
 	isLoading: boolean;
 	isAuthenticated: boolean;
+	error: string;
 	login: (email: string, password: string) => Promise<boolean>;
 	register: (
 		username: string,
 		email: string,
 		password: string,
-	) => Promise<boolean>;
+	) => Promise<RegisterResult>;
 	logout: () => void;
 }
 

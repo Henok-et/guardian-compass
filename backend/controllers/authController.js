@@ -101,7 +101,8 @@ export async function register(req, res) {
 
 		// Send verification email (non-blocking failure)
 		try {
-			const verifyUrl = `${process.env.FRONTEND_URL || "http://localhost:5173"}/login?verified=true&token=${rawToken}`;
+			// Point verify link to backend endpoint so clicking actually triggers verification
+			const verifyUrl = `${process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`}/api/auth/verify-email?token=${rawToken}`;
 
 			await sendEmail({
 				to: user.email,
@@ -284,9 +285,8 @@ export async function resendVerification(req, res) {
 			},
 		);
 
-		const verifyUrl = `${
-			process.env.FRONTEND_URL || "http://localhost:5173"
-		}/verify-email?token=${rawToken}`;
+		// When resending, also point to backend verification endpoint
+		const verifyUrl = `${process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`}/api/auth/verify-email?token=${rawToken}`;
 
 		await sendEmail({
 			to: user.email,

@@ -13,6 +13,8 @@ import ApplicationDetail from "./pages/ApplicationDetail";
 import VerifiedOrganizations from "./pages/VerifiedOrganizations";
 import FlaggedApplications from "./pages/FlaggedApplications";
 import NotFound from "./pages/NotFound";
+import Confirmation from "./pages/Confirmation";
+import RegistrationForm from "./pages/RegistrationForm";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +29,8 @@ const App = () => (
 						<Route path="/" element={<Login />} />
 						<Route path="/login" element={<Login />} />
 						<Route path="/register" element={<Register />} />
+						<Route path="/register/confirmation" element={<Confirmation />} />
+						<Route path="/registration-form" element={<RegistrationForm />} />
 						<Route
 							path="/dashboard"
 							element={

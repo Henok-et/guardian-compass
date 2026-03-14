@@ -1,4 +1,4 @@
-import { ApplicationWithRisk } from '@/hooks/useApplications';
+import type { ApplicationWithRisk } from '@/types/application';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { getRiskBadgeColor } from '@/lib/riskScoring';

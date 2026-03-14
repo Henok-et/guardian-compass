@@ -20,6 +20,7 @@ export async function createUser({
 	role = ROLE_USER,
 	emailVerified = false,
 	emailVerificationToken = null,
+	emailVerificationExpires = null,
 }) {
 	const passwordHash = await bcrypt.hash(password, 10);
 	const col = await getCollection(COLLECTION);
@@ -31,6 +32,7 @@ export async function createUser({
 		createdAt: new Date(),
 		emailVerified,
 		emailVerificationToken,
+		emailVerificationExpires,
 	});
 	return sanitize(await getUserById(result.insertedId));
 }

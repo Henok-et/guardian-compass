@@ -16,7 +16,10 @@
 	"description": "AU Youth Verification - frontend and backend workspaces",
 	"license": "ISC",
 	"dependencies": {
+		"@hookform/resolvers": "^5.2.2",
 		"express-rate-limit": "^8.3.1",
-		"helmet": "^8.1.0"
+		"helmet": "^8.1.0",
+		"react-hook-form": "^7.71.2",
+		"zod": "^4.3.6"
 	}
 }
