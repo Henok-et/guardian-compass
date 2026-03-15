@@ -215,3 +215,45 @@ All colors MUST be HSL.
 		outline-offset: 2px;
 	}
 }
+
+@layer components {
+	.card {
+		@apply bg-card text-card-foreground shadow-lg rounded-xl border border-border/40;
+	}
+
+	.form-label {
+		@apply block text-sm font-semibold text-foreground/80 mb-1.5;
+	}
+
+	.form-input, .input {
+		@apply flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all;
+	}
+
+	.form-input-error {
+		@apply border-error focus-visible:ring-error text-error;
+	}
+
+	.btn {
+		@apply inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2;
+	}
+
+	.btn-primary {
+		@apply bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm font-semibold;
+	}
+
+	.btn-secondary {
+		@apply bg-secondary text-secondary-foreground hover:bg-secondary/80 font-semibold;
+	}
+
+	.btn-outline {
+		@apply border border-input bg-background hover:bg-accent hover:text-accent-foreground font-semibold;
+	}
+
+	.btn-danger {
+		@apply bg-destructive text-destructive-foreground hover:bg-destructive/90 font-semibold;
+	}
+
+	.btn-sm {
+		@apply h-9 rounded-md px-3;
+	}
+}

@@ -298,7 +298,7 @@ export async function refreshSanctions(force = false): Promise<string[]> {
 }
 
 export async function calculateRiskScore(
-	application: ApplicationData,
+	application: any,
 ): Promise<RiskAssessment> {
 	const breakdown: RiskBreakdown = {
 		sanctionsMatch: 0,
@@ -316,7 +316,34 @@ export async function calculateRiskScore(
 		sanctionedName: string;
 		similarity: number;
 	}[] = [];
-	for (const leader of application.leadership) {
+
+	// Map raw application data (nested) to leadership array safely
+	const leadership: LeadershipInfo[] = [];
+	if (application.executive) {
+		leadership.push({
+			name: application.executive.fullName,
+			role: application.executive.role,
+			dob: application.executive.dateOfBirth,
+			hasId: !!application.executive.idDocument,
+			isFinalDecisionMaker: true,
+		});
+	}
+	if (Array.isArray(application.boardMembers)) {
+		application.boardMembers.forEach((member: any) => {
+			leadership.push({
+				name: member.fullName,
+				role: member.role,
+				dob: member.dateOfBirth,
+				hasId: false, // Board members don't upload IDs in the current flow
+			});
+		});
+	}
+	// Fallback to old format if it existed
+	if (Array.isArray(application.leadership)) {
+		leadership.push(...application.leadership);
+	}
+
+	for (const leader of leadership) {
 		const name = leader?.name;
 		if (!name) continue;
 		const match: Awaited<ReturnType<typeof isSanctioned>> =
@@ -334,7 +361,7 @@ export async function calculateRiskScore(
 		}
 	}
 	if (sanctionMatches.length > 0) breakdown.sanctionsMatch = 80;
-	const leadersWithoutId = application.leadership.filter((l) => !l.hasId);
+	const leadersWithoutId = leadership.filter((l) => !l.hasId && l.isFinalDecisionMaker);
 	if (leadersWithoutId.length > 0) {
 		breakdown.missingId = leadersWithoutId.length * 20;
 		reasons.push({
@@ -353,7 +380,7 @@ export async function calculateRiskScore(
 	}
 	let invalidAgeCount = 0;
 	let youthCount = 0;
-	for (const leader of application.leadership) {
+	for (const leader of leadership) {
 		if (
 			typeof leader.age === "number" &&
 			(leader.age > MAX_VALID_AGE || leader.age < MIN_VALID_AGE)
@@ -378,7 +405,7 @@ export async function calculateRiskScore(
 			if (age <= YOUTH_MAX_AGE) youthCount++;
 		}
 	}
-	const totalLeaders = application.leadership.length || 1;
+	const totalLeaders = leadership.length || 1;
 	const youthPercentage = youthCount / totalLeaders;
 	if (youthPercentage < 0.51) {
 		breakdown.nonYouthLeadership = 35;
@@ -388,12 +415,12 @@ export async function calculateRiskScore(
 		});
 	}
 	if (invalidAgeCount > 0) breakdown.invalidData = invalidAgeCount * 25;
+	const orgContext = application.organization || application; // fallback
 	const requiredFields = [
-		application.organizationName?.trim(),
-		application.registrationNumber?.trim(),
-		application.country?.trim(),
-		application.email?.trim(),
-		application.missionStatement?.trim(),
+		orgContext.organizationName?.trim() || orgContext.legalName?.trim(),
+		orgContext.registrationNumber?.trim(),
+		orgContext.country?.trim(),
+		orgContext.email?.trim(),
 	];
 	const incompleteCount = requiredFields.filter((f) => !f).length;
 	if (incompleteCount > 0) {

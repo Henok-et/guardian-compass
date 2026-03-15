@@ -11,21 +11,8 @@ export const executiveSchema = z.object({
 	role: z.string().min(2, "Role/Title is required"),
 	phone: z.string().min(1, "Phone number is required"),
 	email: z.string().email("Must be a valid email"),
-	idDocument: z
-		.any()
-		.refine(
-			(file) =>
-				file &&
-				["application/pdf", "image/png", "image/jpeg", "image/jpg"].includes(
-					file?.type,
-				),
-			{
-				message: "Accepted formats: PDF, PNG, JPG, JPEG",
-			},
-		)
-		.refine((file) => file && file.size <= 3 * 1024 * 1024, {
-			message: "File size must be ≤ 3MB",
-		}),
 });
 
-export type ExecutiveInfo = z.infer<typeof executiveSchema>;
+export type ExecutiveInfo = z.infer<typeof executiveSchema> & {
+	idDocument?: File | null;
+};

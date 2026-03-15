@@ -27,8 +27,8 @@ import {
 	PieChart,
 	Pie,
 	Cell,
-	LineChart,
-	Line,
+	AreaChart,
+	Area,
 } from "recharts";
 import {
 	Globe,
@@ -109,10 +109,11 @@ const AFRICAN_COUNTRIES = [
 
 // Colors for charts (use theme variables for consistent AU branding)
 // NOTE: our CSS variables store HSL components, so we wrap them with `hsl(...)` to form valid CSS colors.
+// Colors for charts (using direct hex values for explicit slice colors in the donut)
 const COLORS = {
-	approved: "hsl(var(--success))",
-	pending: "hsl(var(--warning))",
-	rejected: "hsl(var(--error))",
+	approved: "#10b981", // greenish (emerald-500)
+	pending: "#eab308",  // yellowish (yellow-500)
+	rejected: "#f97316", // orangish (orange-500)
 	flagged: "hsl(var(--primary))",
 	country: "hsl(var(--primary))",
 };
@@ -136,7 +137,16 @@ const Dashboard = memo(() => {
 				return;
 			}
 			try {
-				const res = await fetch(`/api/applications?userId=${user.id}`);
+				const storedAuth = localStorage.getItem("au_verification_auth");
+				let token = "";
+				if (storedAuth) {
+					try {
+						const parsed = JSON.parse(storedAuth);
+						if (parsed.token) token = parsed.token;
+					} catch (e) {}
+				}
+				const headers = token ? { Authorization: `Bearer ${token}` } : {};
+				const res = await fetch(`/api/applications?userId=${user.id}`, { headers });
 				if (res.ok) {
 					const apps = await res.json();
 					if (apps && apps.length > 0) {
@@ -466,17 +476,22 @@ const Dashboard = memo(() => {
 									<BarChart
 										data={countryData}
 										layout="vertical"
-										margin={{ left: 40 }}
+										margin={{ left: 40, right: 20, top: 20, bottom: 5 }}
 									>
-										<CartesianGrid strokeDasharray="3 3" />
-										<XAxis type="number" />
-										<YAxis dataKey="country" type="category" width={100} />
-										<Tooltip />
-										<Legend />
+										<CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} opacity={0.3} />
+										<XAxis type="number" hide />
+										<YAxis dataKey="country" type="category" width={100} axisLine={false} tickLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 13 }} />
+										<Tooltip 
+											cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
+											contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+										/>
+										<Legend wrapperStyle={{ paddingTop: '10px' }} />
 										<Bar
 											dataKey="count"
 											fill={COLORS.country}
 											name="Organizations"
+											radius={[0, 4, 4, 0]}
+											barSize={24}
 										/>
 									</BarChart>
 								</ResponsiveContainer>
@@ -505,18 +520,23 @@ const Dashboard = memo(() => {
 											data={statusData}
 											cx="50%"
 											cy="50%"
-											outerRadius={100}
-											fill={COLORS.approved}
+											innerRadius={65}
+											outerRadius={95}
+											paddingAngle={4}
 											dataKey="value"
+											labelLine={false}
 											label={({ name, percent }) =>
-												`${name} ${(percent * 100).toFixed(0)}%`
+												percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : null
 											}
 										>
 											{statusData.map((entry, index) => (
-												<Cell key={`cell-${index}`} fill={entry.color} />
+												<Cell key={`cell-${index}`} fill={entry.color} stroke="transparent" />
 											))}
 										</Pie>
-										<Tooltip />
+										<Tooltip 
+											contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+											itemStyle={{ color: 'hsl(var(--foreground))' }}
+										/>
 									</PieChart>
 								</ResponsiveContainer>
 							) : (
@@ -539,22 +559,34 @@ const Dashboard = memo(() => {
 									height={300}
 									aria-label="Line chart showing registrations over time"
 								>
-									<LineChart
+									<AreaChart
 										data={timelineData}
-										margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+										margin={{ top: 20, right: 30, left: 10, bottom: 5 }}
 									>
-										<CartesianGrid strokeDasharray="3 3" />
-										<XAxis dataKey="month" />
-										<YAxis />
-										<Tooltip />
-										<Legend />
-										<Line
+										<defs>
+											<linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+												<stop offset="5%" stopColor={COLORS.country} stopOpacity={0.4}/>
+												<stop offset="95%" stopColor={COLORS.country} stopOpacity={0}/>
+											</linearGradient>
+										</defs>
+										<CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+										<XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 13 }} dy={10} />
+										<YAxis axisLine={false} tickLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 13 }} dx={-10} />
+										<Tooltip 
+											contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+										/>
+										<Legend wrapperStyle={{ paddingTop: '20px' }} />
+										<Area
 											type="monotone"
 											dataKey="count"
 											stroke={COLORS.country}
-											activeDot={{ r: 8 }}
+											strokeWidth={3}
+											fillOpacity={1}
+											fill="url(#colorCount)"
+											name="Registrations"
+											activeDot={{ r: 6, strokeWidth: 0, fill: COLORS.country }}
 										/>
-									</LineChart>
+									</AreaChart>
 								</ResponsiveContainer>
 							) : (
 								<div className="flex items-center justify-center h-[300px] text-muted-foreground">

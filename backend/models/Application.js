@@ -18,8 +18,14 @@ export async function ensureApplicationIndexes() {
 export async function createApplication(data) {
 	const col = await getCollection(COLLECTION);
 	const now = new Date();
+	
+	// Generate APP-XXXXXXX identifier using a random hex attached to the prefix
+	const randomHex = Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0').toUpperCase();
+	const generatedAppId = `APP-${randomHex}`;
+
 	const record = {
 		...data,
+		applicationId: generatedAppId,
 		status: data.status || STATUS_PENDING,
 		submittedAt: data.submittedAt || now,
 		createdAt: now,

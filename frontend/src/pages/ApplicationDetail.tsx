@@ -598,7 +598,7 @@ const ApplicationDetail = () => {
 									{application.organizationName}
 								</h1>
 								<p className="text-muted-foreground mt-1">
-									Application ID: {application.id} • Submitted:{" "}
+									Application ID: {application.applicationId || application.id} • Submitted:{" "}
 									{new Date(application.submittedAt).toLocaleDateString()}
 								</p>
 							</div>
@@ -677,9 +677,9 @@ const ApplicationDetail = () => {
 													Location
 												</p>
 												<p>
-													{application.city === application.country
-														? application.country
-														: `${application.city}, ${application.country}`}
+													{application.city && application.city !== application.country
+														? `${application.city}, ${application.country}`
+														: application.country}
 												</p>
 											</div>
 										</div>
@@ -743,18 +743,104 @@ const ApplicationDetail = () => {
 									</CardContent>
 								</Card>
 
-								{/* Mission Statement */}
+				
+								{/* Activities & Impact */}
+								{((application as any).activitiesDescription || (application as any).impactDescription || (application as any).operationalPresence || (application as any).partnerships || (application as any).verificationLinks) && (
+									<Card>
+										<CardHeader>
+											<CardTitle className="flex items-center gap-2">
+												<CheckCircle className="w-5 h-5" />
+												Activities & Impact
+											</CardTitle>
+										</CardHeader>
+										<CardContent className="space-y-5">
+											{(application as any).activitiesDescription && (
+												<div>
+													<p className="text-sm font-semibold text-muted-foreground mb-1">Activities (last 12 months)</p>
+													<p className="text-sm leading-relaxed">{(application as any).activitiesDescription}</p>
+												</div>
+											)}
+											{(application as any).impactDescription && (
+												<div className="pt-3 border-t border-border/50">
+													<p className="text-sm font-semibold text-muted-foreground mb-1">Community Impact</p>
+													<p className="text-sm leading-relaxed">{(application as any).impactDescription}</p>
+												</div>
+											)}
+											{(application as any).operationalPresence && (
+												<div className="flex items-start gap-3 pt-3 border-t border-border/50">
+													<Globe className="w-4 h-4 text-muted-foreground mt-0.5" />
+													<div>
+														<p className="text-sm font-semibold text-muted-foreground">Operational Presence</p>
+														<p className="text-sm">{(application as any).operationalPresence}</p>
+													</div>
+												</div>
+											)}
+											{(application as any).partnerships && (
+												<div className="flex items-start gap-3 pt-3 border-t border-border/50">
+													<Users className="w-4 h-4 text-muted-foreground mt-0.5" />
+													<div>
+														<p className="text-sm font-semibold text-muted-foreground">Partners & Collaborators</p>
+														<p className="text-sm leading-relaxed">{(application as any).partnerships}</p>
+													</div>
+												</div>
+											)}
+											{(application as any).verificationLinks && (
+												<div className="flex items-start gap-3 pt-3 border-t border-border/50">
+													<Globe className="w-4 h-4 text-muted-foreground mt-0.5" />
+													<div>
+														<p className="text-sm font-semibold text-muted-foreground">Verification Links</p>
+														<p className="text-sm whitespace-pre-wrap break-all leading-relaxed">{(application as any).verificationLinks}</p>
+													</div>
+												</div>
+											)}
+										</CardContent>
+									</Card>
+								)}
+
+								{/* Governance & Legal Declarations */}
 								<Card>
 									<CardHeader>
-										<CardTitle>Mission Statement</CardTitle>
+										<CardTitle className="flex items-center gap-2">
+											<Shield className="w-5 h-5" />
+											Governance & Legal Declarations
+										</CardTitle>
 									</CardHeader>
-									<CardContent>
-										<p className="text-muted-foreground">
-											{application.missionStatement || "Not provided"}
-										</p>
+									<CardContent className="space-y-3">
+										{[
+											{
+												checked: (application as any).governanceDeclaration,
+												label: "Governance declaration confirmed",
+											},
+											{
+												checked: (application as any).leadershipResponsibilityDeclaration,
+												label: "Leadership responsibility declaration confirmed",
+											},
+											{
+												checked: (application as any).transparencyDeclaration,
+												label: "Transparency of activities confirmed",
+											},
+											{
+												checked: (application as any).legalDeclaration,
+												label: "Legal declaration confirmed",
+											},
+											{
+												checked: (application as any).authorization,
+												label: "Authorized representative declaration confirmed",
+											},
+										].map((item, i) => (
+											<div key={i} className="flex items-center gap-3 text-sm">
+												{item.checked ? (
+													<CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+												) : (
+													<XCircle className="w-4 h-4 text-muted-foreground/50 flex-shrink-0" />
+												)}
+												<span className={item.checked ? "text-foreground" : "text-muted-foreground"}>
+													{item.label}
+												</span>
+											</div>
+										))}
 									</CardContent>
 								</Card>
-
 								{/* Leadership Team */}
 								<Card>
 									<CardHeader>
@@ -794,7 +880,7 @@ const ApplicationDetail = () => {
 														</div>
 
 														{leader.role && (
-															<p className="text-sm font-medium text-gray-700">
+															<p className="text-sm font-medium text-foreground">
 																{leader.role}
 															</p>
 														)}

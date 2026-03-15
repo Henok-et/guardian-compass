@@ -22,6 +22,10 @@ export default defineConfig(({ mode }) => ({
 		},
 	},
 
+	optimizeDeps: {
+		exclude: ['zod'], // Force Vite to bypass pre-bundling for zod to fix instanceof ZodError checks
+	},
+
 	plugins: [react(), mode === "development" && componentTagger()].filter(
 		Boolean,
 	),

@@ -50,7 +50,7 @@ const Login = () => {
 			if (role === "admin" || role === "officer") {
 				navigate("/dashboard");
 			} else {
-				navigate("/register");
+				navigate("/registration-form");
 			}
 		} else {
 			setError("Invalid email or password");

@@ -5,6 +5,7 @@ import { RiskBreakdown } from "@/lib/riskScoring";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export interface BaseApplication {
 	id: string;
+	applicationId?: string;
 	organizationName: string;
 	registrationNumber?: string;
 	email: string;
@@ -12,9 +13,24 @@ export interface BaseApplication {
 	country: string;
 	city?: string;
 	website?: string;
+	socialMedia?: string;
+	organizationType?: string;
 	memberCount: number;
 	yearEstablished?: string | number;
 	missionStatement?: string;
+	// Activities
+	activitiesDescription?: string;
+	impactDescription?: string;
+	operationalPresence?: string;
+	partnerships?: string;
+	verificationLinks?: string;
+	transparencyDeclaration?: boolean;
+	// Governance
+	governanceDeclaration?: boolean;
+	leadershipResponsibilityDeclaration?: boolean;
+	// Legal
+	legalDeclaration?: boolean;
+	authorization?: boolean;
 	leadership: Array<{
 		name: string;
 		role?: string;
@@ -94,6 +110,7 @@ export function toTrackedApplication(
 
 	return {
 		id: app.id || "",
+		applicationId: app.applicationId || "",
 		organizationName: app.organizationName || "",
 		email: app.email || "",
 		country: app.country || "",

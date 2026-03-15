@@ -15,6 +15,7 @@ import FlaggedApplications from "./pages/FlaggedApplications";
 import NotFound from "./pages/NotFound";
 import Confirmation from "./pages/Confirmation";
 import RegistrationForm from "./pages/RegistrationForm";
+import SuccessPage from "./pages/SuccessPage";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +32,7 @@ const App = () => (
 						<Route path="/register" element={<Register />} />
 						<Route path="/register/confirmation" element={<Confirmation />} />
 						<Route path="/registration-form" element={<RegistrationForm />} />
+						<Route path="/success" element={<SuccessPage />} />
 						<Route
 							path="/dashboard"
 							element={

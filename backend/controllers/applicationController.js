@@ -3,6 +3,7 @@ import {
 	getApplicationById,
 	listApplications,
 	updateApplication,
+	sanitize,
 	STATUS_APPROVED,
 	STATUS_FLAGGED,
 	STATUS_REJECTED,
@@ -21,7 +22,7 @@ export async function listApplicationsHandler(req, res) {
 			filter.userId = user.id;
 		}
 		const applications = await listApplications(filter);
-		return res.json(applications);
+		return res.json(applications.map((app) => sanitize(app)));
 	} catch (err) {
 		console.error("Failed to list applications", err);
 		return res.status(500).json({ message: "Failed to list applications" });
@@ -82,10 +83,8 @@ const ApplicationSchema = z.object({
 			}),
 		)
 		.min(3)
-		.max(15),
+		.max(50),
 	governance: z.object({
-		decisionAuthority: z.string().min(2).max(200),
-		boardSize: z.number().int().min(3),
 		governanceDeclaration: z.boolean(),
 		leadershipResponsibilityDeclaration: z.boolean(),
 	}),

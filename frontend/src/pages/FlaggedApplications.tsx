@@ -129,7 +129,7 @@ const FlaggedApplications = () => {
 												{app.city}, {app.country}
 											</div>
 											<p className="text-sm text-muted-foreground mt-1">
-												ID: {app.id} • Submitted:{" "}
+												ID: {app.applicationId || app.id} • Submitted:{" "}
 												{new Date(app.submittedAt).toLocaleDateString()}
 											</p>
 											{app.actionDate && type === "flagged" && (

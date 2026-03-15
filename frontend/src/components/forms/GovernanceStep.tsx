@@ -5,13 +5,11 @@ import { governanceSchema, GovernanceInfo } from "@/schemas/governanceSchema";
 
 export default function GovernanceStep({
 	defaultValues,
-	minBoardSize,
 	onNext,
 	onPrev,
 	autoSave,
 }: {
 	defaultValues: GovernanceInfo;
-	minBoardSize: number;
 	onNext: (data: GovernanceInfo) => void;
 	onPrev: () => void;
 	autoSave?: (data: GovernanceInfo) => void;
@@ -19,7 +17,6 @@ export default function GovernanceStep({
 	const {
 		register,
 		handleSubmit,
-		setValue,
 		formState: { errors },
 		watch,
 	} = useForm<GovernanceInfo>({
@@ -30,89 +27,62 @@ export default function GovernanceStep({
 
 	// Auto-save draft
 	React.useEffect(() => {
-		if (autoSave) autoSave(watch());
+		if (!autoSave) return;
+		const subscription = watch((value) => {
+			autoSave(value as any);
+		});
+		return () => subscription.unsubscribe();
 	}, [watch, autoSave]);
 
-	// Board size validation
-	const boardSize = watch("boardSize");
-	React.useEffect(() => {
-		if (boardSize < minBoardSize) {
-			setValue("boardSize", minBoardSize);
-		}
-	}, [boardSize, minBoardSize, setValue]);
-
 	return (
-		<form onSubmit={handleSubmit(onNext)} className="space-y-4">
-			<div className="card p-4">
-				<div className="mb-2">
-					<label className="block font-medium">Decision Authority *</label>
-					<input
-						{...register("decisionAuthority")}
-						className="input"
-						autoComplete="off"
-					/>
-					{errors.decisionAuthority && (
-						<div className="text-red-600 text-xs mt-1">
-							{errors.decisionAuthority.message}
-						</div>
-					)}
-				</div>
-				<div className="mb-2">
-					<label className="block font-medium">Total Board Size *</label>
-					<input
-						type="number"
-						{...register("boardSize", { valueAsNumber: true })}
-						className="input"
-						min={minBoardSize}
-					/>
-					<div className="text-xs text-muted-foreground mt-1">
-						Must be ≥ number of board members submitted ({minBoardSize})
+		<form onSubmit={handleSubmit(onNext)} className="space-y-6">
+			<div className="card p-6 sm:p-8">
+				<div className="space-y-6">
+					<div className="pt-4 border-t border-border/50 space-y-4">
+						<label className="flex items-start gap-3 cursor-pointer group">
+							<input 
+								type="checkbox" 
+								{...register("governanceDeclaration")} 
+								className="mt-1 w-4 h-4 rounded border-input text-primary focus:ring-primary/50"
+							/>
+							<span className="text-sm text-foreground/90 group-hover:text-foreground transition-colors leading-relaxed">
+								I confirm that the information provided about the organization's
+								leadership structure is accurate and complete.
+							</span>
+						</label>
+						{errors.governanceDeclaration && (
+							<div className="text-error text-xs pl-7 font-medium">
+								{errors.governanceDeclaration.message}
+							</div>
+						)}
+
+						<label className="flex items-start gap-3 cursor-pointer group">
+							<input
+								type="checkbox"
+								{...register("leadershipResponsibilityDeclaration")}
+								className="mt-1 w-4 h-4 rounded border-input text-primary focus:ring-primary/50"
+							/>
+							<span className="text-sm text-foreground/90 group-hover:text-foreground transition-colors leading-relaxed">
+								I confirm that the individuals listed as executive and board
+								members are actively involved in the governance and
+								decision-making of the organization.
+							</span>
+						</label>
+						{errors.leadershipResponsibilityDeclaration && (
+							<div className="text-error text-xs pl-7 font-medium">
+								{errors.leadershipResponsibilityDeclaration.message}
+							</div>
+						)}
 					</div>
-					{errors.boardSize && (
-						<div className="text-red-600 text-xs mt-1">
-							{errors.boardSize.message}
-						</div>
-					)}
-				</div>
-				<div className="mb-2">
-					<label className="flex items-center gap-2">
-						<input type="checkbox" {...register("governanceDeclaration")} />
-						<span>
-							I confirm that the information provided about the organization's
-							leadership structure is accurate and complete.
-						</span>
-					</label>
-					{errors.governanceDeclaration && (
-						<div className="text-red-600 text-xs mt-1">
-							{errors.governanceDeclaration.message}
-						</div>
-					)}
-				</div>
-				<div className="mb-2">
-					<label className="flex items-center gap-2">
-						<input
-							type="checkbox"
-							{...register("leadershipResponsibilityDeclaration")}
-						/>
-						<span>
-							I confirm that the individuals listed as executive and board
-							members are actively involved in the governance and
-							decision-making of the organization.
-						</span>
-					</label>
-					{errors.leadershipResponsibilityDeclaration && (
-						<div className="text-red-600 text-xs mt-1">
-							{errors.leadershipResponsibilityDeclaration.message}
-						</div>
-					)}
 				</div>
 			</div>
-			<div className="flex justify-between mt-4">
-				<button type="button" className="btn btn-secondary" onClick={onPrev}>
+			
+			<div className="flex justify-between items-center pt-4">
+				<button type="button" className="btn btn-secondary px-6" onClick={onPrev}>
 					Previous
 				</button>
-				<button type="submit" className="btn btn-primary">
-					Next Step
+				<button type="submit" className="btn btn-primary px-8">
+					Continue
 				</button>
 			</div>
 		</form>

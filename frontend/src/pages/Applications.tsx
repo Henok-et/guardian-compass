@@ -47,8 +47,8 @@ const Applications = () => {
 	// pendingApplications already contains only pending items
 	const filteredApplications = pendingApplications.filter((app) => {
 		const matchesSearch =
-			app.organizationName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			app.country.toLowerCase().includes(searchQuery.toLowerCase());
+			(app.organizationName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+			(app.country || "").toLowerCase().includes(searchQuery.toLowerCase());
 
 		const matchesRisk =
 			riskFilter === "all" ? true : app.riskAssessment?.level === riskFilter;
@@ -114,9 +114,9 @@ const Applications = () => {
 							No pending applications found
 						</p>
 					) : (
-						filteredApplications.map((app) => (
+						filteredApplications.map((app, appIdx) => (
 							<Card
-								key={app.id}
+								key={app.id || `app-${appIdx}`}
 								className="border hover:border-primary transition-colors cursor-pointer relative"
 							>
 								<CardHeader className="flex justify-between items-start relative">

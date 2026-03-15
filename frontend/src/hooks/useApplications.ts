@@ -52,16 +52,11 @@ export function useApplications() {
 		}
 
 		try {
-			// Fetch from backend in parallel
-			const [appsResp, wfResp] = await Promise.all([
-				fetch("/api/applications"),
-				fetch("/api/workflow").catch(() => ({
-					ok: false,
-					json: () => ({
-						workflow: { verified: [], flagged: [], rejected: [] },
-					}),
-				})),
-			]);
+			const token = getStoredToken();
+			const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+			// Fetch from backend
+			const appsResp = await fetch("/api/applications", { headers });
 
 			if (!appsResp.ok) {
 				throw new Error(`HTTP error! status: ${appsResp.status}`);
@@ -71,59 +66,73 @@ export function useApplications() {
 
 			// Calculate risk for each
 			const appsWithRisk: ApplicationWithRisk[] = await Promise.all(
-				rawApps.map(async (app) => {
-					const riskAssessment = await calculateRiskScore(app);
+				rawApps.map(async (rawApp: any) => {
+					const riskAssessment = await calculateRiskScore(rawApp);
+					
+					// Safely extract from nested backend structure OR fallback to flat structure
+					const org = rawApp.organization || rawApp;
+					const exec = rawApp.executive;
+					
+					const leadership = [];
+					if (exec) {
+						leadership.push({
+							name: exec.fullName || "Executive",
+							role: exec.role || "Executive",
+							dob: exec.dateOfBirth,
+							hasId: !!exec.idDocument,
+							isFinalDecisionMaker: true,
+						});
+					}
+					if (Array.isArray(rawApp.boardMembers)) {
+						rawApp.boardMembers.forEach((m: any) => {
+							leadership.push({
+								name: m.fullName,
+								role: m.role || "Board Member",
+								dob: m.dateOfBirth,
+								hasId: false,
+							});
+						});
+					}
+					if (Array.isArray(rawApp.leadership) && leadership.length === 0) {
+						leadership.push(...rawApp.leadership);
+					}
+
 					return {
-						...app,
+						id: rawApp.id || (rawApp._id ? String(rawApp._id) : ""),
+						applicationId: rawApp.applicationId,
+						organizationName: org.legalName || org.organizationName || "Unnamed",
+						registrationNumber: org.registrationNumber || "",
+						country: org.country || "",
+						city: org.city || "",
+						email: org.email || exec?.email || "",
+						phone: org.phone || exec?.phone || "",
+						website: org.website || "",
+						socialMedia: org.socialMedia || "",
+						organizationType: org.organizationType || "",
+						memberCount: rawApp.boardMembers?.length || rawApp.memberCount || leadership.length || 0,
+						yearEstablished: org.yearEstablished || rawApp.yearEstablished,
+						missionStatement: org.missionStatement || "",
+						// Activities section
+						activitiesDescription: rawApp.activities?.activitiesDescription || "",
+						impactDescription: rawApp.activities?.impactDescription || "",
+						operationalPresence: rawApp.activities?.operationalPresence || "",
+						partnerships: rawApp.activities?.partnerships || "",
+						verificationLinks: rawApp.activities?.verificationLinks || "",
+						transparencyDeclaration: rawApp.activities?.transparencyDeclaration || false,
+						// Governance section
+						governanceDeclaration: rawApp.governance?.governanceDeclaration || false,
+						leadershipResponsibilityDeclaration: rawApp.governance?.leadershipResponsibilityDeclaration || false,
+						// Legal section
+						legalDeclaration: rawApp.legalDeclaration?.legalDeclaration || false,
+						authorization: rawApp.legalDeclaration?.authorization || false,
+						leadership,
+						status: rawApp.status || "pending",
+						submittedAt: rawApp.submittedAt || new Date().toISOString(),
+						actionDate: rawApp.actionDate,
 						riskAssessment,
 					} as ApplicationWithRisk;
 				}),
 			);
-
-			// Fetch persisted workflow state from backend/Mongo
-			let workflow: any = { verified: [], flagged: [], rejected: [] };
-			try {
-				if (wfResp.ok) {
-					const wfJson = await wfResp.json();
-					workflow = wfJson.workflow || workflow;
-				}
-			} catch (e) {
-				console.warn("Failed to fetch workflow state:", e);
-			}
-
-			// Merge persisted workflow status into our app list (fallback for server-side merge bugs)
-			const appsById = new Map<string, ApplicationWithRisk>();
-			const appsByEmail = new Map<string, ApplicationWithRisk>();
-			const appsByReg = new Map<string, ApplicationWithRisk>();
-			appsWithRisk.forEach((app) => {
-				appsById.set(app.id, app);
-				if (app.email) appsByEmail.set(app.email.toLowerCase(), app);
-				if (app.registrationNumber)
-					appsByReg.set(app.registrationNumber.toLowerCase(), app);
-			});
-
-			const applyPersisted = (
-				list: any[],
-				status: ApplicationWithRisk["status"],
-			) => {
-				(list || []).forEach((stored) => {
-					const id = stored?.id;
-					const email = stored?.email;
-					const reg = stored?.registrationNumber;
-					const app =
-						(id && appsById.get(id)) ||
-						(email && appsByEmail.get(String(email).toLowerCase())) ||
-						(reg && appsByReg.get(String(reg).toLowerCase()));
-					if (app) {
-						app.status = status;
-						app.actionDate = stored?.actionDate || new Date().toISOString();
-					}
-				});
-			};
-
-			applyPersisted(workflow.verified, "approved");
-			applyPersisted(workflow.flagged, "flagged");
-			applyPersisted(workflow.rejected, "rejected");
 
 			const updatedApps = appsWithRisk;
 
@@ -168,12 +177,13 @@ export function useApplications() {
 		async (id: string) => {
 			try {
 				const token = getStoredToken();
-				await fetch(`/api/applications/${encodeURIComponent(id)}/approve`, {
+				await fetch(`/api/applications/${encodeURIComponent(id)}/status`, {
 					method: "POST",
 					headers: Object.assign(
 						{ "Content-Type": "application/json" },
 						token ? { Authorization: `Bearer ${token}` } : {},
 					),
+					body: JSON.stringify({ status: "approved" }),
 				});
 				cachedApplications = null;
 				await loadData();
@@ -188,12 +198,13 @@ export function useApplications() {
 		async (id: string) => {
 			try {
 				const token = getStoredToken();
-				await fetch(`/api/applications/${encodeURIComponent(id)}/reject`, {
+				await fetch(`/api/applications/${encodeURIComponent(id)}/status`, {
 					method: "POST",
 					headers: Object.assign(
 						{ "Content-Type": "application/json" },
 						token ? { Authorization: `Bearer ${token}` } : {},
 					),
+					body: JSON.stringify({ status: "rejected" }),
 				});
 				cachedApplications = null;
 				await loadData();
@@ -208,12 +219,13 @@ export function useApplications() {
 		async (id: string) => {
 			try {
 				const token = getStoredToken();
-				await fetch(`/api/applications/${encodeURIComponent(id)}/flag`, {
+				await fetch(`/api/applications/${encodeURIComponent(id)}/status`, {
 					method: "POST",
 					headers: Object.assign(
 						{ "Content-Type": "application/json" },
 						token ? { Authorization: `Bearer ${token}` } : {},
 					),
+					body: JSON.stringify({ status: "flagged" }),
 				});
 				cachedApplications = null;
 				await loadData();
