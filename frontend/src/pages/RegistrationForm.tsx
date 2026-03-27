@@ -1,4 +1,5 @@
-// Removed corrupted fragment
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from "react";
 import { Sun, Moon } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
@@ -19,54 +20,56 @@ function RegistrationForm() {
 		"Activities & Impact",
 		"Legal Declaration",
 	];
-	
+
 	const { user, isLoading } = useAuthContext();
 	const [step, setStep] = useState(0);
 	const [formState, setFormState] = useState(() => {
 		const draft = localStorage.getItem("registrationDraft");
-		return draft ? JSON.parse(draft) : {
-			organization: {
-				legalName: "",
-				registrationNumber: "",
-				country: "",
-				yearEstablished: new Date().getFullYear(),
-				organizationType: "NGO",
-				website: "",
-				socialMedia: "",
-				email: "",
-				phone: "",
-			},
-			executive: {
-				fullName: "",
-				dateOfBirth: "",
-				gender: undefined,
-				role: "",
-				phone: "",
-				email: "",
-				idDocument: null,
-			},
-			boardMembers: [],
-			governance: {
-				decisionAuthority: "",
-				boardSize: 0,
-				governanceDeclaration: false,
-				leadershipResponsibilityDeclaration: false,
-			},
-			youthVerification: {},
-			activities: {
-				activitiesDescription: "",
-				impactDescription: "",
-				operationalPresence: "Local community",
-				partnerships: "",
-				verificationLinks: "",
-				transparencyDeclaration: false,
-			},
-			documents: {},
-			legalDeclaration: {
-				legalDeclaration: false,
-				authorization: false,
-			},
-		};
+		return draft
+			? JSON.parse(draft)
+			: {
+					organization: {
+						legalName: "",
+						registrationNumber: "",
+						country: "",
+						yearEstablished: new Date().getFullYear(),
+						organizationType: "NGO",
+						website: "",
+						socialMedia: "",
+						email: "",
+						phone: "",
+					},
+					executive: {
+						fullName: "",
+						dateOfBirth: "",
+						gender: undefined,
+						role: "",
+						phone: "",
+						email: "",
+						idDocument: null,
+					},
+					boardMembers: [],
+					governance: {
+						decisionAuthority: "",
+						boardSize: 0,
+						governanceDeclaration: false,
+						leadershipResponsibilityDeclaration: false,
+					},
+					youthVerification: {},
+					activities: {
+						activitiesDescription: "",
+						impactDescription: "",
+						operationalPresence: "Local community",
+						partnerships: "",
+						verificationLinks: "",
+						transparencyDeclaration: false,
+					},
+					documents: {},
+					legalDeclaration: {
+						legalDeclaration: false,
+						authorization: false,
+					},
+				};
 	});
 	const navigate = useNavigate();
 	const [isDark, setIsDark] = useState(false);
@@ -75,7 +78,9 @@ function RegistrationForm() {
 	}, [formState]);
 	useEffect(() => {
 		const saved = localStorage.getItem("theme");
-		const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+		const prefersDark = window.matchMedia(
+			"(prefers-color-scheme: dark)",
+		).matches;
 		const initialDark = saved === "dark" || (!saved && prefersDark);
 		setIsDark(initialDark);
 		document.documentElement.classList.toggle("dark", initialDark);
@@ -92,14 +97,33 @@ function RegistrationForm() {
 		navigate("/login");
 	};
 
-	const autoSaveOrganization = React.useCallback((data: any) => setFormState((prev) => ({ ...prev, organization: data })), []);
-	const autoSaveExecutive = React.useCallback((data: any) => setFormState((prev) => ({ ...prev, executive: data })), []);
-	const autoSaveBoardMembers = React.useCallback((data: any) => setFormState((prev) => ({ ...prev, boardMembers: data })), []);
-	const autoSaveGovernance = React.useCallback((data: any) => setFormState((prev) => ({ ...prev, governance: data })), []);
-	const autoSaveActivities = React.useCallback((data: any) => setFormState((prev) => ({ ...prev, activities: data })), []);
+	const autoSaveOrganization = React.useCallback(
+		(data: any) => setFormState((prev) => ({ ...prev, organization: data })),
+		[],
+	);
+	const autoSaveExecutive = React.useCallback(
+		(data: any) => setFormState((prev) => ({ ...prev, executive: data })),
+		[],
+	);
+	const autoSaveBoardMembers = React.useCallback(
+		(data: any) => setFormState((prev) => ({ ...prev, boardMembers: data })),
+		[],
+	);
+	const autoSaveGovernance = React.useCallback(
+		(data: any) => setFormState((prev) => ({ ...prev, governance: data })),
+		[],
+	);
+	const autoSaveActivities = React.useCallback(
+		(data: any) => setFormState((prev) => ({ ...prev, activities: data })),
+		[],
+	);
 
 	const clearDraft = () => {
-		if (window.confirm("Are you sure you want to clear your current progress? All data will be lost.")) {
+		if (
+			window.confirm(
+				"Are you sure you want to clear your current progress? All data will be lost.",
+			)
+		) {
 			localStorage.removeItem("registrationDraft");
 			setFormState({
 				organization: {
@@ -189,7 +213,11 @@ function RegistrationForm() {
 		!!formState.organization.phone;
 
 	if (isLoading) {
-		return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+		return (
+			<div className="min-h-screen flex items-center justify-center">
+				Loading...
+			</div>
+		);
 	}
 
 	if (!user || user.role !== "user") {
@@ -284,9 +312,9 @@ function RegistrationForm() {
 
 							const res = await fetch("/api/applications", {
 								method: "POST",
-								headers: { 
+								headers: {
 									"Content-Type": "application/json",
-									"Authorization": `Bearer ${token}`
+									Authorization: `Bearer ${token}`,
 								},
 								body: JSON.stringify({ ...formState, legalDeclaration: data }),
 							});
@@ -333,14 +361,20 @@ function RegistrationForm() {
 						<div className="flex items-center justify-between">
 							<div className="flex items-center gap-3">
 								<div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-sm">
-									<span className="font-bold text-lg text-primary leading-none">AU</span>
+									<span className="font-bold text-lg text-primary leading-none">
+										AU
+									</span>
 								</div>
 								<div>
-									<h1 className="font-bold text-lg text-foreground tracking-tight leading-tight">Registration</h1>
-									<p className="text-xs text-muted-foreground font-medium">Youth Organization</p>
+									<h1 className="font-bold text-lg text-foreground tracking-tight leading-tight">
+										Registration
+									</h1>
+									<p className="text-xs text-muted-foreground font-medium">
+										Youth Organization
+									</p>
 								</div>
 							</div>
-							
+
 							{/* Utility Nav (Mobile only, hidden on desktop as it moves to bottom) */}
 							<div className="md:hidden flex items-center gap-2">
 								<button
@@ -349,12 +383,17 @@ function RegistrationForm() {
 								>
 									Clear Form
 								</button>
-								<button
-									className="w-8 h-8 rounded-full flex items-center justify-center text-foreground/70 hover:bg-muted"
-								>
-									{isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+								<button className="w-8 h-8 rounded-full flex items-center justify-center text-foreground/70 hover:bg-muted">
+									{isDark ? (
+										<Sun className="h-4 w-4" />
+									) : (
+										<Moon className="h-4 w-4" />
+									)}
 								</button>
-								<button onClick={handleLogout} className="text-xs font-semibold text-muted-foreground">
+								<button
+									onClick={handleLogout}
+									className="text-xs font-semibold text-muted-foreground"
+								>
 									Logout
 								</button>
 							</div>
@@ -371,13 +410,13 @@ function RegistrationForm() {
 								Step {step + 1} of {steps.length}
 							</div>
 							<div className="text-sm font-medium text-muted-foreground">
-								{Math.round(((step) / (steps.length - 1)) * 100)}%
+								{Math.round((step / (steps.length - 1)) * 100)}%
 							</div>
 						</div>
 						<div className="h-2 w-full bg-muted/50 rounded-full overflow-hidden">
-							<div 
+							<div
 								className="h-full bg-primary transition-all duration-500 ease-out"
-								style={{ width: `${((step) / (steps.length - 1)) * 100}%` }}
+								style={{ width: `${(step / (steps.length - 1)) * 100}%` }}
 							/>
 						</div>
 					</div>
@@ -386,20 +425,27 @@ function RegistrationForm() {
 					<div className="space-y-1 relative before:absolute before:inset-0 before:ml-4 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border/40 before:to-transparent hidden">
 						{/* Keeping it simple instead of complex timeline */}
 					</div>
-					
+
 					<div className="space-y-4">
 						{steps.map((label, idx) => {
 							const completed = idx < step;
 							const current = idx === step;
 							const pending = idx > step;
-							
+
 							return (
-								<div key={label} className={`flex items-start gap-3 p-3 rounded-lg border transition-all ${current ? "bg-primary/5 border-primary/30" : "border-transparent"}`}>
-									<div className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${completed ? "bg-primary text-primary-foreground" : current ? "bg-background border-2 border-primary text-primary" : "bg-muted text-muted-foreground"}`}>
+								<div
+									key={label}
+									className={`flex items-start gap-3 p-3 rounded-lg border transition-all ${current ? "bg-primary/5 border-primary/30" : "border-transparent"}`}
+								>
+									<div
+										className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${completed ? "bg-primary text-primary-foreground" : current ? "bg-background border-2 border-primary text-primary" : "bg-muted text-muted-foreground"}`}
+									>
 										{completed ? "✓" : idx + 1}
 									</div>
 									<div className="pt-0.5">
-										<p className={`text-sm font-medium ${current ? "text-primary" : pending ? "text-muted-foreground" : "text-foreground"}`}>
+										<p
+											className={`text-sm font-medium ${current ? "text-primary" : pending ? "text-muted-foreground" : "text-foreground"}`}
+										>
 											{label}
 										</p>
 										{current && (
@@ -417,13 +463,26 @@ function RegistrationForm() {
 					<div className="mt-auto pt-6">
 						<div className="p-4 rounded-xl border border-primary/20 bg-primary/5 shadow-sm">
 							<div className="flex items-start gap-3">
-								<svg className="w-5 h-5 text-primary shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+								<svg
+									className="w-5 h-5 text-primary shrink-0 mt-0.5"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+								>
+									<path
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										strokeWidth={2}
+										d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+									/>
 								</svg>
 								<div>
-									<h4 className="text-sm font-bold text-foreground">Youth-Led Criteria</h4>
+									<h4 className="text-sm font-bold text-foreground">
+										Youth-Led Criteria
+									</h4>
 									<p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-										Organizations must demonstrate at least 51% youth ownership (ages 15-35) in board and executive roles.
+										Organizations must demonstrate at least 51% youth ownership
+										(ages 15-35) in board and executive roles.
 									</p>
 								</div>
 							</div>
@@ -434,23 +493,40 @@ function RegistrationForm() {
 				{/* Sidebar Footer (Desktop) */}
 				<div className="hidden md:flex flex-col gap-3 p-6 border-t border-border/40 bg-muted/10">
 					<div className="flex items-center gap-2">
-						<button onClick={clearDraft} className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-background border border-border hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors text-foreground">
+						<button
+							onClick={clearDraft}
+							className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-background border border-border hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors text-foreground"
+						>
 							Clear Form
 						</button>
 					</div>
 					<div className="flex items-center justify-between pt-2">
 						<div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
 							<div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs text-primary">
-								{user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U"}
+								{user?.name?.[0]?.toUpperCase() ||
+									user?.email?.[0]?.toUpperCase() ||
+									"U"}
 							</div>
-							<span className="truncate max-w-[120px]">{user?.name || user?.email || "User"}</span>
+							<span className="truncate max-w-[120px]">
+								{user?.name || user?.email || "User"}
+							</span>
 						</div>
 						<div className="flex items-center gap-2">
-							<button onClick={toggleTheme} className="text-muted-foreground hover:text-foreground">
-								{isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+							<button
+								onClick={toggleTheme}
+								className="text-muted-foreground hover:text-foreground"
+							>
+								{isDark ? (
+									<Sun className="h-4 w-4" />
+								) : (
+									<Moon className="h-4 w-4" />
+								)}
 							</button>
 							<span className="w-px h-4 bg-border"></span>
-							<button onClick={handleLogout} className="text-xs font-semibold text-muted-foreground hover:text-destructive">
+							<button
+								onClick={handleLogout}
+								className="text-xs font-semibold text-muted-foreground hover:text-destructive"
+							>
 								Logout
 							</button>
 						</div>
@@ -463,13 +539,17 @@ function RegistrationForm() {
 				{/* Mobile Stepper Header (visible only on small screens) */}
 				<div className="md:hidden p-4 border-b border-border/40 bg-card sticky top-0 z-10">
 					<div className="flex items-center justify-between mb-2">
-						<span className="text-sm font-bold text-primary">Step {step + 1} of {steps.length}</span>
-						<span className="text-sm font-bold text-foreground">{steps[step]}</span>
+						<span className="text-sm font-bold text-primary">
+							Step {step + 1} of {steps.length}
+						</span>
+						<span className="text-sm font-bold text-foreground">
+							{steps[step]}
+						</span>
 					</div>
 					<div className="h-1.5 w-full bg-muted/50 rounded-full overflow-hidden">
-						<div 
+						<div
 							className="h-full bg-primary transition-all duration-300"
-							style={{ width: `${((step) / (steps.length - 1)) * 100}%` }}
+							style={{ width: `${(step / (steps.length - 1)) * 100}%` }}
 						/>
 					</div>
 				</div>
@@ -478,16 +558,16 @@ function RegistrationForm() {
 					<div className="max-w-3xl mx-auto">
 						{/* Desktop Header for active step */}
 						<div className="hidden md:block mb-8">
-							<h2 className="text-3xl font-bold text-foreground tracking-tight">{steps[step]}</h2>
+							<h2 className="text-3xl font-bold text-foreground tracking-tight">
+								{steps[step]}
+							</h2>
 							<p className="text-muted-foreground mt-2 text-lg">
 								{getStepGuidance()}
 							</p>
 						</div>
 
 						{/* Ensure active form step takes full width of container */}
-						<div className="w-full">
-							{renderStep()}
-						</div>
+						<div className="w-full">{renderStep()}</div>
 					</div>
 				</div>
 			</div>

@@ -12,7 +12,7 @@ const schema = z.object({
 	registrationNumber: z.string().min(1, "Registration number is required"),
 	country: z.string().min(1, "Country is required"),
 	yearEstablished: z
-		.number({ error: "Year must be a number" })
+		.number({ invalid_type_error: "Year must be a number" })
 		.int()
 		.lte(currentYear, `Year must be ≤ ${currentYear}`),
 	organizationType: z.enum([
